@@ -26,7 +26,10 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tracker}
+      # POSTGRES_PASSWORD_URLENC is the percent-encoded form of POSTGRES_PASSWORD,
+      # required because compose does plain string substitution here with no
+      # URL-encoding, and a raw password with @, :, /, # etc. breaks URL parsing.
+      DATABASE_URL: postgres://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD_URLENC:?POSTGRES_PASSWORD_URLENC is required}@postgres:5432/${POSTGRES_DB:-tracker}
       PHOTO_DIR: /app/data/photos
       OCR_PROVIDER: ${OCR_PROVIDER:-google-vision}
       # All optional. An unset key means photo import is unavailable for that
