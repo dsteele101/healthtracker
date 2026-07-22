@@ -48,6 +48,47 @@ function IconPicker({
  *  log form asks for, and the icon. Existing types predate icon/tracks_weight
  *  and carry them as null/false, so this has to be reachable after creation,
  *  not just at add-time. */
+/** Trims to null-or-valid-http(s)-URL, mirroring the server validator. */
+function parseInfoUrl(value: string): { ok: true; value: string | null } | { ok: false } {
+  const trimmed = value.trim()
+  if (!trimmed) return { ok: true, value: null }
+  try {
+    const parsed = new URL(trimmed)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return { ok: false }
+  } catch {
+    return { ok: false }
+  }
+  return { ok: true, value: trimmed }
+}
+
+/** Link/video URL field, shared between the create form and per-row editor. */
+function InfoUrlField({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="field">
+      <label className="label" htmlFor={id}>
+        More info (optional)
+      </label>
+      <input
+        id={id}
+        type="url"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="https://…"
+        autoComplete="off"
+      />
+      <p className="hint">Link to a video or article demonstrating the exercise.</p>
+    </div>
+  )
+}
+
 function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(type.name)
@@ -55,6 +96,7 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
   const [tracksDuration, setTracksDuration] = useState(type.tracks_duration)
   const [tracksWeight, setTracksWeight] = useState(type.tracks_weight)
   const [icon, setIcon] = useState(type.icon)
+  const [infoUrl, setInfoUrl] = useState(type.info_url ?? '')
   const [error, setError] = useState<string | null>(null)
 
   function startEditing() {
@@ -63,6 +105,7 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
     setTracksDuration(type.tracks_duration)
     setTracksWeight(type.tracks_weight)
     setIcon(type.icon)
+    setInfoUrl(type.info_url ?? '')
     setError(null)
     setEditing(true)
   }
@@ -74,6 +117,8 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
     if (!tracksReps && !tracksDuration) {
       return setError('Track reps, time, or both. Weight can be added to either.')
     }
+    const parsedInfoUrl = parseInfoUrl(infoUrl)
+    if (!parsedInfoUrl.ok) return setError('More info link must be a valid URL.')
 
     await local.put('exercise_types', {
       ...type,
@@ -82,6 +127,7 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
       tracks_duration: tracksDuration,
       tracks_weight: tracksWeight,
       icon,
+      info_url: parsedInfoUrl.value,
       updated_at: new Date().toISOString(),
     })
     setEditing(false)
@@ -121,6 +167,8 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
           <span className="label">Icon</span>
           <IconPicker value={icon} onChange={setIcon} />
         </div>
+
+        <InfoUrlField id={`info-url-${type.id}`} value={infoUrl} onChange={setInfoUrl} />
 
         {error && <p className="error">{error}</p>}
 
@@ -238,6 +286,7 @@ export default function ExerciseTypesPage() {
   const [tracksDuration, setTracksDuration] = useState(false)
   const [tracksWeight, setTracksWeight] = useState(false)
   const [icon, setIcon] = useState<string | null>(null)
+  const [infoUrl, setInfoUrl] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   async function addType(event: React.FormEvent) {
@@ -254,6 +303,9 @@ export default function ExerciseTypesPage() {
     const duplicate = types?.some((t) => t.name.toLowerCase() === trimmed.toLowerCase())
     if (duplicate) return setError(`"${trimmed}" already exists.`)
 
+    const parsedInfoUrl = parseInfoUrl(infoUrl)
+    if (!parsedInfoUrl.ok) return setError('More info link must be a valid URL.')
+
     const now = new Date().toISOString()
     const row: ExerciseType = {
       id: crypto.randomUUID(),
@@ -262,6 +314,7 @@ export default function ExerciseTypesPage() {
       tracks_duration: tracksDuration,
       tracks_weight: tracksWeight,
       icon,
+      info_url: parsedInfoUrl.value,
       created_at: now,
       updated_at: now,
       deleted_at: null,
@@ -273,6 +326,7 @@ export default function ExerciseTypesPage() {
     setTracksDuration(false)
     setTracksWeight(false)
     setIcon(null)
+    setInfoUrl('')
     setError(null)
   }
 
@@ -316,6 +370,8 @@ export default function ExerciseTypesPage() {
           <span className="label">Icon</span>
           <IconPicker value={icon} onChange={setIcon} />
         </div>
+
+        <InfoUrlField id="info-url-new" value={infoUrl} onChange={setInfoUrl} />
 
         {error && <p className="error">{error}</p>}
 

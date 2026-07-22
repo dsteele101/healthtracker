@@ -370,15 +370,25 @@ export default function Home() {
                 {item.icon ?? DEFAULT_EXERCISE_ICON}
               </span>
             )}
-            <div className="grow">
-              <div className="subtitle">{item.heading}</div>
-              {/* Metrics and timestamp on separate lines: joined into one they
-                  wrap mid-date on a narrow phone, which reads as a mistake. */}
-              {item.detail && <div className="muted mono">{item.detail}</div>}
-              <div className="muted mono">{formatWhen(item.performedAt)}</div>
-              {item.note && <div className="muted">{item.note}</div>}
-              {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
-            </div>
+            {item.table === 'exercise_entries' && item.exerciseTypeId ? (
+              <Link href={`/exercise/${item.exerciseTypeId}`} className="grow">
+                <div className="subtitle">{item.heading}</div>
+                {/* Metrics and timestamp on separate lines: joined into one they
+                    wrap mid-date on a narrow phone, which reads as a mistake. */}
+                {item.detail && <div className="muted mono">{item.detail}</div>}
+                <div className="muted mono">{formatWhen(item.performedAt)}</div>
+                {item.note && <div className="muted">{item.note}</div>}
+                {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
+              </Link>
+            ) : (
+              <div className="grow">
+                <div className="subtitle">{item.heading}</div>
+                {item.detail && <div className="muted mono">{item.detail}</div>}
+                <div className="muted mono">{formatWhen(item.performedAt)}</div>
+                {item.note && <div className="muted">{item.note}</div>}
+                {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
+              </div>
+            )}
 
             <div className="row">
               {item.pending && <span className="pill">Unsaved</span>}

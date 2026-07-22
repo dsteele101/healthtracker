@@ -14,14 +14,15 @@ import { validate } from '@/lib/validate'
 const UPSERTS: Record<SyncTable, string> = {
   exercise_types: `
     INSERT INTO exercise_types
-      (id, name, tracks_reps, tracks_duration, tracks_weight, icon, created_at, updated_at, deleted_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      (id, name, tracks_reps, tracks_duration, tracks_weight, icon, info_url, created_at, updated_at, deleted_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     ON CONFLICT (id) DO UPDATE SET
       name            = EXCLUDED.name,
       tracks_reps     = EXCLUDED.tracks_reps,
       tracks_duration = EXCLUDED.tracks_duration,
       tracks_weight   = EXCLUDED.tracks_weight,
       icon            = EXCLUDED.icon,
+      info_url        = EXCLUDED.info_url,
       updated_at      = EXCLUDED.updated_at,
       deleted_at      = EXCLUDED.deleted_at,
       server_seq      = nextval('sync_seq')
@@ -73,7 +74,7 @@ function params(table: SyncTable, row: Record<string, unknown>): unknown[] {
     case 'exercise_types':
       return [
         row.id, row.name, row.tracks_reps, row.tracks_duration, row.tracks_weight, row.icon,
-        row.created_at, row.updated_at, row.deleted_at,
+        row.info_url, row.created_at, row.updated_at, row.deleted_at,
       ]
     case 'exercise_entries':
       return [

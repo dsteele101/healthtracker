@@ -25,6 +25,8 @@ export interface ExerciseType extends Syncable {
   tracks_weight: boolean
   /** Single emoji shown on the type's entries. Null falls back to a generic icon. */
   icon: string | null
+  /** Optional link to a video or article explaining the exercise, shown on its detail page. */
+  info_url: string | null
 }
 
 export interface ExerciseEntry extends Syncable {

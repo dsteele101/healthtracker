@@ -83,6 +83,20 @@ function uuidOrNull(row: Row, field: string): string | null {
   return uuid(row, field)
 }
 
+function urlOrNull(row: Row, field: string, max: number): string | null {
+  const value = textOrNull(row, field, max)
+  if (value === null) return value
+  try {
+    const parsed = new URL(value)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error()
+    }
+  } catch {
+    throw new Error(`${field} must be a valid http(s) URL`)
+  }
+  return value
+}
+
 function wrap<T>(fn: () => T): Validated<T> {
   try {
     return { ok: true, value: fn() }
@@ -101,6 +115,7 @@ function validateExerciseType(row: Row): Validated<ExerciseType> {
     // Generous for multi-codepoint emoji (skin tone modifiers, ZWJ sequences)
     // without allowing an actual icon-length string in.
     icon: textOrNull(row, 'icon', 16),
+    info_url: urlOrNull(row, 'info_url', 2000),
     created_at: iso(row, 'created_at'),
     updated_at: iso(row, 'updated_at'),
     deleted_at: isoOrNull(row, 'deleted_at'),

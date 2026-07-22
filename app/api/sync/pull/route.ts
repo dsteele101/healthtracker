@@ -7,7 +7,7 @@ const PAGE_SIZE = 500
 
 const COLUMNS: Record<SyncTable, string> = {
   exercise_types: `
-    id, name, tracks_reps, tracks_duration, tracks_weight, icon,
+    id, name, tracks_reps, tracks_duration, tracks_weight, icon, info_url,
     created_at, updated_at, deleted_at, server_seq
   `,
   exercise_entries: `

@@ -99,11 +99,16 @@ function ExercisePanel({
 
   const [remembered] = useState(readRememberedType)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
 
   const fallbackId =
     remembered && types?.some((t) => t.id === remembered) ? remembered : types?.[0]?.id
   const typeId = selectedId ?? fallbackId ?? ''
   const selected = types?.find((t) => t.id === typeId)
+
+  const filteredTypes = types?.filter((t) =>
+    t.name.toLowerCase().includes(query.trim().toLowerCase()),
+  )
 
   const cutoff = useCutoff(range)
 
@@ -151,13 +156,43 @@ function ExercisePanel({
         <label className="label" htmlFor="stats-type">
           Exercise
         </label>
-        <select id="stats-type" value={typeId} onChange={(e) => setSelectedId(e.target.value)}>
-          {types?.map((type) => (
-            <option key={type.id} value={type.id}>
-              {type.name}
-            </option>
-          ))}
-        </select>
+        <input
+          id="stats-type"
+          value={query}
+          placeholder={selected?.name ?? 'Search exercises…'}
+          onChange={(e) => setQuery(e.target.value)}
+          autoComplete="off"
+        />
+        {query.trim() && (
+          <div
+            className="stack"
+            style={{
+              marginTop: 8,
+              maxHeight: 240,
+              overflowY: 'auto',
+              gap: 6,
+            }}
+          >
+            {filteredTypes?.length ? (
+              filteredTypes.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  className="btn btn-block"
+                  style={type.id === typeId ? { borderColor: 'var(--accent)' } : undefined}
+                  onClick={() => {
+                    setSelectedId(type.id)
+                    setQuery('')
+                  }}
+                >
+                  {type.name}
+                </button>
+              ))
+            ) : (
+              <p className="muted">No exercises match &ldquo;{query.trim()}&rdquo;.</p>
+            )}
+          </div>
+        )}
       </div>
 
       <RangePicker range={range} onChange={onRangeChange} />
