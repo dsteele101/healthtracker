@@ -57,6 +57,25 @@ export function formatWhen(iso: string): string {
   })
 }
 
+/** "Today" / "Yesterday" / "Tue, Jul 21" — formatWhen without the time-of-day,
+ *  for figures that summarize a whole calendar day rather than one instant. */
+export function formatDay(iso: string): string {
+  const date = new Date(iso)
+  const now = new Date()
+  if (date.toDateString() === now.toDateString()) return 'Today'
+
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return 'Yesterday'
+
+  return date.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+  })
+}
+
 /** Value for a `datetime-local` input, which wants local time with no zone. */
 export function toDatetimeLocal(iso: string): string {
   const date = new Date(iso)

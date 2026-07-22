@@ -21,6 +21,8 @@ export interface ExerciseType extends Syncable {
   tracks_reps: boolean
   /** ... or for time (a plank). Both may be true. */
   tracks_duration: boolean
+  /** Single emoji shown on the type's entries. Null falls back to a generic icon. */
+  icon: string | null
 }
 
 export interface ExerciseEntry extends Syncable {
