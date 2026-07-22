@@ -108,6 +108,7 @@ function validateExerciseEntry(row: Row): Validated<ExerciseEntry> {
     return {
       id: uuid(row, 'id'),
       exercise_type_id: uuid(row, 'exercise_type_id'),
+      sets: int(row, 'sets', 1, 1000),
       reps,
       duration_seconds: duration,
       notes: textOrNull(row, 'notes', 2000),

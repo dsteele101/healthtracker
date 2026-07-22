@@ -32,6 +32,7 @@ export default function LogExercisePage() {
   const [remembered] = useState(readRememberedType)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [sets, setSets] = useState('1')
   const [reps, setReps] = useState('')
   const [duration, setDuration] = useState('')
   const [notes, setNotes] = useState('')
@@ -50,6 +51,11 @@ export default function LogExercisePage() {
   async function save(event: React.FormEvent) {
     event.preventDefault()
     if (!selected) return setError('Pick an exercise.')
+
+    const setsValue = Number(sets)
+    if (!Number.isInteger(setsValue) || setsValue < 1) {
+      return setError('Sets must be a whole number, at least 1.')
+    }
 
     let repsValue: number | null = null
     if (selected.tracks_reps && reps.trim()) {
@@ -77,6 +83,7 @@ export default function LogExercisePage() {
     const entry: ExerciseEntry = {
       id: crypto.randomUUID(),
       exercise_type_id: selected.id,
+      sets: setsValue,
       reps: repsValue,
       duration_seconds: durationValue,
       notes: notes.trim() || null,
@@ -140,6 +147,23 @@ export default function LogExercisePage() {
               </option>
             ))}
           </select>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="sets">
+            Sets
+          </label>
+          <input
+            id="sets"
+            inputMode="numeric"
+            value={sets}
+            onChange={(e) => {
+              setSets(e.target.value)
+              setError(null)
+            }}
+            placeholder="1"
+            autoComplete="off"
+          />
         </div>
 
         {/* Only the fields this exercise actually measures. */}

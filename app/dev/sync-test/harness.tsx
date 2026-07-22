@@ -32,6 +32,7 @@ function makeEntry(typeId: string, overrides: Partial<ExerciseEntry> = {}): Exer
   return {
     id: crypto.randomUUID(),
     exercise_type_id: typeId,
+    sets: 1,
     reps: 10,
     duration_seconds: null,
     notes: null,

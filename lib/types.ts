@@ -27,6 +27,7 @@ export interface ExerciseType extends Syncable {
 
 export interface ExerciseEntry extends Syncable {
   exercise_type_id: string
+  sets: number
   reps: number | null
   duration_seconds: number | null
   notes: string | null

@@ -93,10 +93,11 @@ export async function buildExerciseCsv(): Promise<string> {
   const sorted = [...entries].sort((a, b) => a.performed_at.localeCompare(b.performed_at))
 
   return csvRows(
-    ['performed_at', 'exercise', 'reps', 'duration_seconds', 'duration', 'notes'],
+    ['performed_at', 'exercise', 'sets', 'reps', 'duration_seconds', 'duration', 'notes'],
     sorted.map((e) => [
       e.performed_at,
       nameOf(e.exercise_type_id),
+      e.sets,
       e.reps,
       e.duration_seconds,
       // Both the raw seconds and a readable form: one sorts and sums in a

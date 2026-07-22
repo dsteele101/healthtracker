@@ -67,6 +67,7 @@ export default function Home() {
       exerciseTypeId: entry.exercise_type_id,
       heading: typeOf(entry.exercise_type_id)?.name ?? 'Unknown exercise',
       detail: [
+        entry.sets != null && `${entry.sets} ${entry.sets === 1 ? 'set' : 'sets'}`,
         entry.reps !== null && `${entry.reps} reps`,
         entry.duration_seconds !== null && formatDuration(entry.duration_seconds),
       ]
