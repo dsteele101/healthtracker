@@ -32,6 +32,7 @@ export default function LogExercisePage() {
   const [remembered] = useState(readRememberedType)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
   const [sets, setSets] = useState('1')
   const [reps, setReps] = useState('')
   const [duration, setDuration] = useState('')
@@ -48,6 +49,10 @@ export default function LogExercisePage() {
     remembered && types?.some((t) => t.id === remembered) ? remembered : types?.[0]?.id
   const typeId = selectedId ?? fallbackId ?? ''
   const selected = types?.find((t) => t.id === typeId)
+
+  const filteredTypes = types?.filter((t) =>
+    t.name.toLowerCase().includes(query.trim().toLowerCase()),
+  )
 
   async function save(event: React.FormEvent) {
     event.preventDefault()
@@ -140,24 +145,55 @@ export default function LogExercisePage() {
 
       <form onSubmit={save} className="stack">
         <div className="field">
-          <label className="label" htmlFor="type">
+          <label className="label" htmlFor="type-search">
             Exercise
           </label>
-          <select
-            id="type"
-            value={typeId}
+          <input
+            id="type-search"
+            value={query}
             suppressHydrationWarning
+            placeholder={selected?.name ?? 'Search exercises…'}
             onChange={(e) => {
-              setSelectedId(e.target.value)
+              setQuery(e.target.value)
               setError(null)
             }}
-          >
-            {types?.map((type) => (
-              <option key={type.id} value={type.id}>
-                {type.name}
-              </option>
-            ))}
-          </select>
+            autoComplete="off"
+          />
+          {query.trim() && (
+            <div
+              className="stack"
+              style={{
+                marginTop: 8,
+                maxHeight: 240,
+                overflowY: 'auto',
+                gap: 6,
+              }}
+            >
+              {filteredTypes?.length ? (
+                filteredTypes.map((type) => (
+                  <button
+                    key={type.id}
+                    type="button"
+                    className="btn btn-block"
+                    style={
+                      type.id === typeId
+                        ? { borderColor: 'var(--accent)' }
+                        : undefined
+                    }
+                    onClick={() => {
+                      setSelectedId(type.id)
+                      setQuery('')
+                      setError(null)
+                    }}
+                  >
+                    {type.name}
+                  </button>
+                ))
+              ) : (
+                <p className="muted">No exercises match &ldquo;{query.trim()}&rdquo;.</p>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="field">
