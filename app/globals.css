@@ -269,6 +269,57 @@ a:has(> .thumb):active .thumb {
   flex-shrink: 0;
 }
 
+/* Embedded YouTube/Vimeo player for an exercise's info_url. Fixed aspect
+   ratio via padding-top so the layout doesn't jump once the iframe loads. */
+.link-preview-video {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--background);
+}
+
+.link-preview-video iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* Open Graph card for a non-video info_url. */
+.link-preview-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+@media (hover: hover) {
+  a.link-preview-card:hover {
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  }
+}
+
+.link-preview-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  background: var(--background);
+  flex-shrink: 0;
+}
+
+.link-preview-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* --- controls -------------------------------------------------------------- */
 
 .btn {

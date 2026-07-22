@@ -11,6 +11,7 @@ import { DEFAULT_EXERCISE_ICON } from '@/lib/exercise-icons'
 import { parseInfoUrl } from '@/lib/info-url'
 import { SyncBadge } from '../../components/sync-badge'
 import { InfoUrlField } from '../../components/info-url-field'
+import { LinkPreview } from '../../components/link-preview'
 
 /** The "more info" link plus its own inline editor, so setting or changing it
  *  doesn't require a trip to Manage Exercises. Local state here (rather than
@@ -59,17 +60,7 @@ function InfoLinkSection({ type }: { type: local.Local<ExerciseType> }) {
 
   return (
     <>
-      {type.info_url && (
-        <a
-          href={type.info_url}
-          target="_blank"
-          rel="noreferrer"
-          className="btn btn-block"
-          style={{ borderColor: 'var(--accent)' }}
-        >
-          More info ↗
-        </a>
-      )}
+      {type.info_url && <LinkPreview url={type.info_url} />}
       <button type="button" className="btn btn-block" onClick={startEditing}>
         {type.info_url ? 'Edit link' : 'Add a link or video'}
       </button>
