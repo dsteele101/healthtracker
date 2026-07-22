@@ -28,14 +28,15 @@ const UPSERTS: Record<SyncTable, string> = {
   `,
   exercise_entries: `
     INSERT INTO exercise_entries
-      (id, exercise_type_id, sets, reps, duration_seconds, notes, performed_at,
+      (id, exercise_type_id, sets, reps, duration_seconds, weight, notes, performed_at,
        session_id, created_at, updated_at, deleted_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     ON CONFLICT (id) DO UPDATE SET
       exercise_type_id = EXCLUDED.exercise_type_id,
       sets             = EXCLUDED.sets,
       reps             = EXCLUDED.reps,
       duration_seconds = EXCLUDED.duration_seconds,
+      weight           = EXCLUDED.weight,
       notes            = EXCLUDED.notes,
       performed_at     = EXCLUDED.performed_at,
       session_id       = EXCLUDED.session_id,
@@ -75,8 +76,9 @@ function params(table: SyncTable, row: Record<string, unknown>): unknown[] {
       ]
     case 'exercise_entries':
       return [
-        row.id, row.exercise_type_id, row.sets, row.reps, row.duration_seconds, row.notes,
-        row.performed_at, row.session_id, row.created_at, row.updated_at, row.deleted_at,
+        row.id, row.exercise_type_id, row.sets, row.reps, row.duration_seconds, row.weight,
+        row.notes, row.performed_at, row.session_id, row.created_at, row.updated_at,
+        row.deleted_at,
       ]
     case 'ddr_entries':
       return [

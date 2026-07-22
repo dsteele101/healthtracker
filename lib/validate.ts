@@ -68,6 +68,16 @@ function int(row: Row, field: string, min: number, max: number): number {
   return intOrNull(row, field, min, max) as number
 }
 
+function numberOrNull(row: Row, field: string, min: number, max: number): number | null {
+  if (row[field] == null) return null
+  const value = row[field]
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    throw new Error(`${field} must be a number`)
+  }
+  if (value < min || value > max) throw new Error(`${field} must be between ${min} and ${max}`)
+  return Math.round(value * 100) / 100
+}
+
 function uuidOrNull(row: Row, field: string): string | null {
   if (row[field] == null) return null
   return uuid(row, field)
@@ -111,6 +121,7 @@ function validateExerciseEntry(row: Row): Validated<ExerciseEntry> {
       sets: int(row, 'sets', 1, 1000),
       reps,
       duration_seconds: duration,
+      weight: numberOrNull(row, 'weight', 0, 10_000),
       notes: textOrNull(row, 'notes', 2000),
       performed_at: iso(row, 'performed_at'),
       session_id: uuidOrNull(row, 'session_id'),

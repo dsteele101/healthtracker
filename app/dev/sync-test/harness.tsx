@@ -35,6 +35,7 @@ function makeEntry(typeId: string, overrides: Partial<ExerciseEntry> = {}): Exer
     sets: 1,
     reps: 10,
     duration_seconds: null,
+    weight: null,
     notes: null,
     performed_at: iso(),
     session_id: null,

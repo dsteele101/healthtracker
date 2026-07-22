@@ -30,6 +30,7 @@ export interface ExerciseEntry extends Syncable {
   sets: number
   reps: number | null
   duration_seconds: number | null
+  weight: number | null
   notes: string | null
   performed_at: Iso
   session_id: string | null

@@ -35,6 +35,7 @@ export default function LogExercisePage() {
   const [sets, setSets] = useState('1')
   const [reps, setReps] = useState('')
   const [duration, setDuration] = useState('')
+  const [weight, setWeight] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -78,6 +79,15 @@ export default function LogExercisePage() {
       return setError('Add reps, a time, or a note.')
     }
 
+    let weightValue: number | null = null
+    if (weight.trim()) {
+      const parsed = Number(weight)
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return setError('Weight must be a positive number.')
+      }
+      weightValue = Math.round(parsed * 100) / 100
+    }
+
     setSaving(true)
     const now = new Date().toISOString()
     const entry: ExerciseEntry = {
@@ -86,6 +96,7 @@ export default function LogExercisePage() {
       sets: setsValue,
       reps: repsValue,
       duration_seconds: durationValue,
+      weight: weightValue,
       notes: notes.trim() || null,
       performed_at: performedAt ? fromDatetimeLocal(performedAt) : now,
       session_id: null,
@@ -209,6 +220,23 @@ export default function LogExercisePage() {
             <p className="hint">Seconds (90) or clock time (1:30).</p>
           </div>
         )}
+
+        <div className="field">
+          <label className="label" htmlFor="weight">
+            Weight
+          </label>
+          <input
+            id="weight"
+            inputMode="decimal"
+            value={weight}
+            onChange={(e) => {
+              setWeight(e.target.value)
+              setError(null)
+            }}
+            placeholder="Optional"
+            autoComplete="off"
+          />
+        </div>
 
         <div className="field">
           <label className="label" htmlFor="when">

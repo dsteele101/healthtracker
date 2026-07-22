@@ -70,6 +70,7 @@ export default function Home() {
         entry.sets != null && `${entry.sets} ${entry.sets === 1 ? 'set' : 'sets'}`,
         entry.reps !== null && `${entry.reps} reps`,
         entry.duration_seconds !== null && formatDuration(entry.duration_seconds),
+        entry.weight !== null && `${entry.weight} lb`,
       ]
         .filter(Boolean)
         .join(' · '),
