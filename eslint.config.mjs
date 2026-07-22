@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored, minified runtime assets staged by `npm run setup:tesseract`.
+    // Not our source, and linting them buries real findings under thousands
+    // of warnings from generated code.
+    "public/tesseract/**",
+    // Service worker: plain browser JS, not part of the TS project.
+    "public/sw.js",
   ]),
 ]);
 

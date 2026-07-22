@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tracker}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-tracker}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Host path for pg_dump output, so backups survive `docker compose down -v`.
+      - ./backups:/backups
+    # No ports mapping on purpose: Postgres is reachable only from the compose
+    # network, never from the host or the LAN.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tracker} -d ${POSTGRES_DB:-tracker}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-tracker}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-tracker}
+      PHOTO_DIR: /app/data/photos
+      OCR_PROVIDER: ${OCR_PROVIDER:-google-vision}
+      # All optional. An unset key means photo import is unavailable for that
+      # provider and the form falls back to manual entry.
+      GOOGLE_VISION_API_KEY: ${GOOGLE_VISION_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    volumes:
+      - photos:/app/data/photos
+    # Bound to loopback only. cloudflared runs on the host and connects to
+    # 127.0.0.1:3000; nothing else on the LAN can reach the app directly.
+    ports:
+      - "127.0.0.1:3000:3000"
+    # Migrations apply on every start. They're idempotent — already-applied
+    # files are skipped — so this is safe on restart and makes deploys one step.
+    command: sh -c "node scripts/migrate.mjs && node server.js"
+
+volumes:
+  pgdata:
+  photos:

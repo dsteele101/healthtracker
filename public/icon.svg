@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0d1128"/>
+      <stop offset="100%" stop-color="#1c2456"/>
+    </linearGradient>
+    <linearGradient id="arrow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffb35c"/>
+      <stop offset="100%" stop-color="#f0791f"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- DDR-style up arrow -->
+  <path d="M256 96 L392 232 L320 232 L320 336 L192 336 L192 232 L120 232 Z"
+        fill="url(#arrow)"/>
+  <!-- progress bar beneath, reads as tracking -->
+  <rect x="152" y="384" width="208" height="28" rx="14" fill="#0d1128" opacity="0.55"/>
+  <rect x="152" y="384" width="140" height="28" rx="14" fill="#34d399"/>
+</svg>

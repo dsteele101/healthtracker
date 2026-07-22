@@ -1,13 +1,37 @@
+/* Palette pulled from Project OutFox — navy panels, warm-orange arrow accent,
+   green combo/ok, cyan-leaning focus ring — to match its rhythm-game look. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f8fc;
+  --surface: #eceef7;
+  --border: #ccd2e8;
+  --foreground: #141a35;
+  --muted: #565f85;
+  --accent: #f0791f;
+  --accent-contrast: #17193a;
+  --danger: #dc2626;
+  --ok: #059669;
+
+  color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0d1128;
+    --surface: #161b3a;
+    --border: #2c3566;
+    --foreground: #eef0fb;
+    --muted: #9aa3d1;
+    --accent: #ff8a3d;
+    --accent-contrast: #14152b;
+    --danger: #f87171;
+    --ok: #34d399;
   }
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
 }
 
 html {
@@ -26,15 +50,19 @@ body {
   flex-direction: column;
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Rajdhani is self-hosted via @fontsource (files ship in the npm package,
+     fetched once at `npm install`), so `next build` still needs no network —
+     see the import in layout.tsx. Condensed + technical, reads like a
+     rhythm-game HUD; weight 500 as the body default since we only ship
+     500/600/700. */
+  font-family: "Rajdhani", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+  /* Keep content clear of the notch and home indicator in standalone mode. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 a {
@@ -42,8 +70,249 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+/* Thumb-sized tap targets — this is used one-handed, mid-workout. */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  min-height: 44px;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  min-height: 44px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0 12px;
+  width: 100%;
+}
+
+/* iOS zooms the viewport when focusing an input below 16px. */
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- layout ---------------------------------------------------------------- */
+
+.page {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px 96px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.spread {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- type ------------------------------------------------------------------ */
+
+.title {
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.subtitle {
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* --- surfaces -------------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+/* --- controls -------------------------------------------------------------- */
+
+.btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+  border-radius: 10px;
+  padding: 0 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+  box-shadow: 0 3px 0 0 color-mix(in srgb, var(--accent) 60%, black);
+}
+
+.btn-primary:active {
+  box-shadow: none;
+  transform: translateY(3px);
+}
+
+.btn-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  background: transparent;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-lg {
+  min-height: 56px;
+  font-size: 1.05rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.error {
+  font-size: 0.85rem;
+  color: var(--danger);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+}
+
+.checkbox input {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+/* --- badges ---------------------------------------------------------------- */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pill-warn {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+}
+
+.pill-ok {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--border));
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
 }

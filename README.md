@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Health Tracker
 
-## Getting Started
+Personal exercise and Dance Dance Revolution log. A phone-installable PWA,
+self-hosted, that keeps working with no signal.
 
-First, run the development server:
+- **Offline-first.** Every entry is written to IndexedDB and rendered from there,
+  then synced. Logging in a basement gym works exactly the same as at home.
+- **Self-hosted.** Next.js + Postgres in Docker on your own box, reached through
+  a Cloudflare Tunnel at `tracker.dsteele.net`.
+- **No login.** Cloudflare Access authenticates at the edge, so the app has no
+  sign-in screen, no sessions, and no user table.
+- **Exportable.** JSON (complete, re-importable) and CSV (spreadsheet-friendly),
+  generated on-device so they work with the server down.
+- **Photo import.** Snap a DDR results screen and the entry form pre-fills.
+  Four interchangeable OCR providers behind one interface; nothing saves without
+  confirmation.
+
+## Setup and operations
+
+See **[docs/operations.md](docs/operations.md)** for Cloudflare Tunnel + Access,
+deployment, backups, and restore procedure.
+
+## Local development
+
+Needs Node 20.9+ and a Postgres 17 you can reach.
 
 ```bash
+npm install
+cp .env.example .env        # set DATABASE_URL
+npm run migrate             # apply db/migrations/*.sql
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Command | |
+|---|---|
+| `npm run dev` | dev server on :3000 |
+| `npm run build` / `npm start` | production build and serve |
+| `npm run migrate` | apply pending migrations (idempotent) |
+| `npm run setup:tesseract` | stage local OCR assets (only for the tesseract provider) |
+| `npm run lint` | eslint |
+| `npx tsc --noEmit` | typecheck |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`/dev/sync-test` runs the local-store and sync-engine suite in the browser. It
+404s in production.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Layout
 
-## Learn More
+```
+app/                  routes; all data-driven screens are client components
+  api/sync/           push + pull endpoints
+  log/exercise|ddr/   entry forms
+  types/              exercise type management
+  data/               export and import
+lib/
+  local-db.ts         IndexedDB store — every write lands here first
+  sync.ts             push/pull engine, offline and auth handling
+  export.ts           JSON + CSV export, JSON import
+  validate.ts         server-side row validation
+  ocr/                photo import: provider registry + shared parse layer
+db/migrations/        numbered SQL, applied in order on container start
+scripts/              migrate, backup, restore-check
+docs/operations.md    runbook
+```
 
-To learn more about Next.js, take a look at the following resources:
+## How sync works
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Writes go to IndexedDB and are flagged pending. A push sends the pending rows;
+a pull asks for everything after a cursor. Two details carry most of the weight:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Conflicts resolve on `updated_at`** (set by the client at edit time), but the
+  **pull cursor is a server-assigned sequence** — never a timestamp. A client
+  clock as a cursor breaks under skew: a phone running slow writes rows that
+  another device's cursor steps straight over, and they never arrive.
+- **Deletes are tombstones.** Without them a deleted row is resurrected by
+  whichever device still holds a copy.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Anything short of an explicit success leaves the queue untouched, so an offline
+gym session, a dead server, and an expired Access session are all safe.
