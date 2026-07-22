@@ -13,19 +13,30 @@ function createPool(): Pool {
   return new Pool({ connectionString, max: 10 })
 }
 
-/* Reused across hot reloads in dev, where module state is discarded on every
+/* Lazily created on first use, not at module load, so that importing this
+ * module during `next build` (e.g. via static prerendering) doesn't require
+ * DATABASE_URL or a reachable Postgres instance at build time.
+ *
+ * Reused across hot reloads in dev, where module state is discarded on every
  * edit and a fresh pool per reload would leak connections until Postgres
  * refuses new ones. */
-export const pool: Pool = globalThis.__dbPool ?? createPool()
-
-if (process.env.NODE_ENV !== 'production') {
-  globalThis.__dbPool = pool
+function getPool(): Pool {
+  if (!globalThis.__dbPool) {
+    globalThis.__dbPool = createPool()
+  }
+  return globalThis.__dbPool
 }
+
+export const pool: Pool = new Proxy({} as Pool, {
+  get(_target, prop, receiver) {
+    return Reflect.get(getPool(), prop, receiver)
+  },
+})
 
 export async function query<T extends Record<string, unknown>>(
   text: string,
   params?: unknown[],
 ): Promise<T[]> {
-  const result = await pool.query(text, params)
+  const result = await getPool().query(text, params)
   return result.rows as T[]
 }
