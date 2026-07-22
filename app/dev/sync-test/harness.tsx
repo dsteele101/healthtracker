@@ -20,6 +20,7 @@ function makeType(overrides: Partial<ExerciseType> = {}): ExerciseType {
     name: `Type ${id.slice(0, 8)}`,
     tracks_reps: true,
     tracks_duration: false,
+    tracks_weight: false,
     icon: null,
     created_at: iso(),
     updated_at: iso(),

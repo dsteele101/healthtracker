@@ -44,21 +44,96 @@ function IconPicker({
   )
 }
 
-/** Existing types predate this field and carry icon: null — editable inline
- *  rather than only at creation, so they aren't stuck showing the fallback.
- *  The picker renders below the whole row rather than inside it: nested in
- *  the row's flex layout, an open grid stretched the row's height instead of
- *  pushing content down the page. */
+/** Edits everything about an existing type in place: name, which fields the
+ *  log form asks for, and the icon. Existing types predate icon/tracks_weight
+ *  and carry them as null/false, so this has to be reachable after creation,
+ *  not just at add-time. */
 function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
-  const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(type.name)
+  const [tracksReps, setTracksReps] = useState(type.tracks_reps)
+  const [tracksDuration, setTracksDuration] = useState(type.tracks_duration)
+  const [tracksWeight, setTracksWeight] = useState(type.tracks_weight)
+  const [icon, setIcon] = useState(type.icon)
+  const [error, setError] = useState<string | null>(null)
 
-  async function choose(icon: string | null) {
+  function startEditing() {
+    setName(type.name)
+    setTracksReps(type.tracks_reps)
+    setTracksDuration(type.tracks_duration)
+    setTracksWeight(type.tracks_weight)
+    setIcon(type.icon)
+    setError(null)
+    setEditing(true)
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return setError('Give it a name.')
+    if (!tracksReps && !tracksDuration) {
+      return setError('Track reps, time, or both. Weight can be added to either.')
+    }
+
     await local.put('exercise_types', {
       ...type,
+      name: trimmed,
+      tracks_reps: tracksReps,
+      tracks_duration: tracksDuration,
+      tracks_weight: tracksWeight,
       icon,
       updated_at: new Date().toISOString(),
     })
-    setOpen(false)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={save} className="card stack">
+        <div className="field">
+          <label className="label" htmlFor={`name-${type.id}`}>
+            Name
+          </label>
+          <input
+            id={`name-${type.id}`}
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value)
+              setError(null)
+            }}
+            autoComplete="off"
+          />
+        </div>
+
+        <MeasuredByFields
+          tracksReps={tracksReps}
+          tracksDuration={tracksDuration}
+          tracksWeight={tracksWeight}
+          onChange={(field, checked) => {
+            setError(null)
+            if (field === 'reps') setTracksReps(checked)
+            if (field === 'duration') setTracksDuration(checked)
+            if (field === 'weight') setTracksWeight(checked)
+          }}
+        />
+
+        <div className="field">
+          <span className="label">Icon</span>
+          <IconPicker value={icon} onChange={setIcon} />
+        </div>
+
+        {error && <p className="error">{error}</p>}
+
+        <div className="spread">
+          <button type="button" className="btn" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            Save
+          </button>
+        </div>
+      </form>
+    )
   }
 
   return (
@@ -67,8 +142,8 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
         <button
           type="button"
           className="btn type-icon-btn"
-          aria-label={`Change icon for ${type.name}`}
-          onClick={() => setOpen((o) => !o)}
+          aria-label={`Edit ${type.name}`}
+          onClick={startEditing}
         >
           <span className="type-icon" aria-hidden="true">
             {type.icon ?? DEFAULT_EXERCISE_ICON}
@@ -77,7 +152,11 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
         <div className="grow">
           <div className="subtitle">{type.name}</div>
           <div className="muted">
-            {[type.tracks_reps && 'reps', type.tracks_duration && 'time']
+            {[
+              type.tracks_reps && 'reps',
+              type.tracks_duration && 'time',
+              type.tracks_weight && 'weight',
+            ]
               .filter(Boolean)
               .join(' · ')}
           </div>
@@ -85,6 +164,9 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
             <div className="error">Rejected: {type.rejected_reason}</div>
           )}
         </div>
+        <button type="button" className="btn" onClick={startEditing}>
+          Edit
+        </button>
         <button
           type="button"
           className="btn btn-danger"
@@ -99,7 +181,51 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
           Remove
         </button>
       </div>
-      {open && <IconPicker value={type.icon} onChange={choose} />}
+    </div>
+  )
+}
+
+/** Shared between the create form and the per-row editor so the three
+ *  checkboxes stay in sync. */
+function MeasuredByFields({
+  tracksReps,
+  tracksDuration,
+  tracksWeight,
+  onChange,
+}: {
+  tracksReps: boolean
+  tracksDuration: boolean
+  tracksWeight: boolean
+  onChange: (field: 'reps' | 'duration' | 'weight', checked: boolean) => void
+}) {
+  return (
+    <div>
+      <span className="label">Measured by</span>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={tracksReps}
+          onChange={(e) => onChange('reps', e.target.checked)}
+        />
+        Reps
+      </label>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={tracksDuration}
+          onChange={(e) => onChange('duration', e.target.checked)}
+        />
+        Time
+      </label>
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={tracksWeight}
+          onChange={(e) => onChange('weight', e.target.checked)}
+        />
+        Weight
+      </label>
+      <p className="hint">Decides which fields the log form shows.</p>
     </div>
   )
 }
@@ -110,6 +236,7 @@ export default function ExerciseTypesPage() {
   const [name, setName] = useState('')
   const [tracksReps, setTracksReps] = useState(true)
   const [tracksDuration, setTracksDuration] = useState(false)
+  const [tracksWeight, setTracksWeight] = useState(false)
   const [icon, setIcon] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -133,6 +260,7 @@ export default function ExerciseTypesPage() {
       name: trimmed,
       tracks_reps: tracksReps,
       tracks_duration: tracksDuration,
+      tracks_weight: tracksWeight,
       icon,
       created_at: now,
       updated_at: now,
@@ -143,6 +271,7 @@ export default function ExerciseTypesPage() {
     setName('')
     setTracksReps(true)
     setTracksDuration(false)
+    setTracksWeight(false)
     setIcon(null)
     setError(null)
   }
@@ -171,32 +300,17 @@ export default function ExerciseTypesPage() {
           />
         </div>
 
-        <div>
-          <span className="label">Measured by</span>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={tracksReps}
-              onChange={(e) => {
-                setTracksReps(e.target.checked)
-                setError(null)
-              }}
-            />
-            Reps
-          </label>
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              checked={tracksDuration}
-              onChange={(e) => {
-                setTracksDuration(e.target.checked)
-                setError(null)
-              }}
-            />
-            Time
-          </label>
-          <p className="hint">Decides which fields the log form shows.</p>
-        </div>
+        <MeasuredByFields
+          tracksReps={tracksReps}
+          tracksDuration={tracksDuration}
+          tracksWeight={tracksWeight}
+          onChange={(field, checked) => {
+            setError(null)
+            if (field === 'reps') setTracksReps(checked)
+            if (field === 'duration') setTracksDuration(checked)
+            if (field === 'weight') setTracksWeight(checked)
+          }}
+        />
 
         <div className="field">
           <span className="label">Icon</span>

@@ -85,7 +85,7 @@ export default function LogExercisePage() {
     }
 
     let weightValue: number | null = null
-    if (weight.trim()) {
+    if (selected.tracks_weight && weight.trim()) {
       const parsed = Number(weight)
       if (!Number.isFinite(parsed) || parsed < 0) {
         return setError('Weight must be a positive number.')
@@ -257,22 +257,24 @@ export default function LogExercisePage() {
           </div>
         )}
 
-        <div className="field">
-          <label className="label" htmlFor="weight">
-            Weight
-          </label>
-          <input
-            id="weight"
-            inputMode="decimal"
-            value={weight}
-            onChange={(e) => {
-              setWeight(e.target.value)
-              setError(null)
-            }}
-            placeholder="Optional"
-            autoComplete="off"
-          />
-        </div>
+        {selected?.tracks_weight && (
+          <div className="field">
+            <label className="label" htmlFor="weight">
+              Weight
+            </label>
+            <input
+              id="weight"
+              inputMode="decimal"
+              value={weight}
+              onChange={(e) => {
+                setWeight(e.target.value)
+                setError(null)
+              }}
+              placeholder="Optional"
+              autoComplete="off"
+            />
+          </div>
+        )}
 
         <div className="field">
           <label className="label" htmlFor="when">

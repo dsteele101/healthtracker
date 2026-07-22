@@ -97,6 +97,7 @@ function validateExerciseType(row: Row): Validated<ExerciseType> {
     name: text(row, 'name', 120),
     tracks_reps: bool(row, 'tracks_reps'),
     tracks_duration: bool(row, 'tracks_duration'),
+    tracks_weight: bool(row, 'tracks_weight'),
     // Generous for multi-codepoint emoji (skin tone modifiers, ZWJ sequences)
     // without allowing an actual icon-length string in.
     icon: textOrNull(row, 'icon', 16),
