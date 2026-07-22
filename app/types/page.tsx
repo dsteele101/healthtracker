@@ -6,7 +6,9 @@ import * as local from '@/lib/local-db'
 import { useExerciseTypes } from '@/lib/use-store'
 import type { ExerciseType } from '@/lib/types'
 import { DEFAULT_EXERCISE_ICON, EXERCISE_ICON_PRESETS } from '@/lib/exercise-icons'
+import { parseInfoUrl } from '@/lib/info-url'
 import { SyncBadge } from '../components/sync-badge'
+import { InfoUrlField } from '../components/info-url-field'
 
 /** Preset grid plus a "no icon" option that clears back to the generic
  *  fallback. Shared between the create form and the per-row editor below. */
@@ -48,47 +50,6 @@ function IconPicker({
  *  log form asks for, and the icon. Existing types predate icon/tracks_weight
  *  and carry them as null/false, so this has to be reachable after creation,
  *  not just at add-time. */
-/** Trims to null-or-valid-http(s)-URL, mirroring the server validator. */
-function parseInfoUrl(value: string): { ok: true; value: string | null } | { ok: false } {
-  const trimmed = value.trim()
-  if (!trimmed) return { ok: true, value: null }
-  try {
-    const parsed = new URL(trimmed)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return { ok: false }
-  } catch {
-    return { ok: false }
-  }
-  return { ok: true, value: trimmed }
-}
-
-/** Link/video URL field, shared between the create form and per-row editor. */
-function InfoUrlField({
-  id,
-  value,
-  onChange,
-}: {
-  id: string
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <div className="field">
-      <label className="label" htmlFor={id}>
-        More info (optional)
-      </label>
-      <input
-        id={id}
-        type="url"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="https://…"
-        autoComplete="off"
-      />
-      <p className="hint">Link to a video or article demonstrating the exercise.</p>
-    </div>
-  )
-}
-
 function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(type.name)

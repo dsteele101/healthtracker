@@ -2,11 +2,80 @@
 
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { useState } from 'react'
 import * as local from '@/lib/local-db'
 import { formatDuration, formatWhen } from '@/lib/format'
 import { useExerciseEntries, useExerciseTypes } from '@/lib/use-store'
+import type { ExerciseType } from '@/lib/types'
 import { DEFAULT_EXERCISE_ICON } from '@/lib/exercise-icons'
+import { parseInfoUrl } from '@/lib/info-url'
 import { SyncBadge } from '../../components/sync-badge'
+import { InfoUrlField } from '../../components/info-url-field'
+
+/** The "more info" link plus its own inline editor, so setting or changing it
+ *  doesn't require a trip to Manage Exercises. Local state here (rather than
+ *  deriving from `type` on every render) mirrors TypeRow on the types page:
+ *  it only needs to reflect the row's current value when editing starts. */
+function InfoLinkSection({ type }: { type: local.Local<ExerciseType> }) {
+  const [editing, setEditing] = useState(false)
+  const [infoUrl, setInfoUrl] = useState(type.info_url ?? '')
+  const [error, setError] = useState<string | null>(null)
+
+  function startEditing() {
+    setInfoUrl(type.info_url ?? '')
+    setError(null)
+    setEditing(true)
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault()
+    const parsed = parseInfoUrl(infoUrl)
+    if (!parsed.ok) return setError('Must be a valid URL.')
+
+    await local.put('exercise_types', {
+      ...type,
+      info_url: parsed.value,
+      updated_at: new Date().toISOString(),
+    })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={save} className="stack">
+        <InfoUrlField id="info-url" value={infoUrl} onChange={setInfoUrl} />
+        {error && <p className="error">{error}</p>}
+        <div className="spread">
+          <button type="button" className="btn" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            Save
+          </button>
+        </div>
+      </form>
+    )
+  }
+
+  return (
+    <>
+      {type.info_url && (
+        <a
+          href={type.info_url}
+          target="_blank"
+          rel="noreferrer"
+          className="btn btn-block"
+          style={{ borderColor: 'var(--accent)' }}
+        >
+          More info ↗
+        </a>
+      )}
+      <button type="button" className="btn btn-block" onClick={startEditing}>
+        {type.info_url ? 'Edit link' : 'Add a link or video'}
+      </button>
+    </>
+  )
+}
 
 export default function ExerciseDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -68,17 +137,7 @@ export default function ExerciseDetailPage() {
           </div>
         </div>
 
-        {type.info_url && (
-          <a
-            href={type.info_url}
-            target="_blank"
-            rel="noreferrer"
-            className="btn btn-block"
-            style={{ borderColor: 'var(--accent)' }}
-          >
-            More info ↗
-          </a>
-        )}
+        <InfoLinkSection type={type} />
 
         <Link href="/log/exercise" className="btn btn-primary btn-block">
           Log {type.name}
