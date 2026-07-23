@@ -24,10 +24,13 @@ export default function DataPage() {
   const [busy, setBusy] = useState(false)
 
   // CSV-only: JSON stays a full, unfiltered backup so it's always a safe
-  // restore target.
-  const [start, setStart] = useState('')
-  const [end, setEnd] = useState('')
+  // restore target. Exercise and DDR get their own filters since neither
+  // date range nor exercise type is guaranteed to mean the same thing to both.
+  const [exerciseStart, setExerciseStart] = useState('')
+  const [exerciseEnd, setExerciseEnd] = useState('')
   const [exerciseTypeId, setExerciseTypeId] = useState('')
+  const [ddrStart, setDdrStart] = useState('')
+  const [ddrEnd, setDdrEnd] = useState('')
 
   async function run(label: string, action: () => Promise<string>) {
     setBusy(true)
@@ -54,22 +57,25 @@ export default function DataPage() {
       return `Exported ${count} entries as JSON.`
     })
 
-  const exportCsv = () =>
+  const exportExerciseCsv = () =>
     run('Export', async () => {
-      const filter = {
-        start: start || undefined,
-        end: end || undefined,
+      const csv = await buildExerciseCsv({
+        start: exerciseStart || undefined,
+        end: exerciseEnd || undefined,
         exerciseTypeId: exerciseTypeId || undefined,
-      }
-      // Two files rather than one: the columns don't overlap, and flattening
-      // them together would produce a sheet that's mostly empty cells.
-      const [exerciseCsv, ddrCsv] = await Promise.all([
-        buildExerciseCsv(filter),
-        buildDdrCsv(filter),
-      ])
-      download(timestampedName('healthtracker-exercise', 'csv'), exerciseCsv, 'text/csv')
-      download(timestampedName('healthtracker-ddr', 'csv'), ddrCsv, 'text/csv')
-      return 'Exported two CSV files: exercise and DDR.'
+      })
+      download(timestampedName('healthtracker-exercise', 'csv'), csv, 'text/csv')
+      return 'Exported exercise CSV.'
+    })
+
+  const exportDdrCsv = () =>
+    run('Export', async () => {
+      const csv = await buildDdrCsv({
+        start: ddrStart || undefined,
+        end: ddrEnd || undefined,
+      })
+      download(timestampedName('healthtracker-ddr', 'csv'), csv, 'text/csv')
+      return 'Exported DDR CSV.'
     })
 
   const onFile = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,23 +121,26 @@ export default function DataPage() {
           Complete, including deletions. This is the file to keep as a backup and the
           one Import reads.
         </p>
+        <hr className="divider" />
+
+        <h3 className="hint">Exercise CSV</h3>
         <div className="row">
           <label className="stack" style={{ flex: 1 }}>
             <span className="hint">From</span>
             <input
               type="date"
-              value={start}
-              max={end || undefined}
-              onChange={(e) => setStart(e.target.value)}
+              value={exerciseStart}
+              max={exerciseEnd || undefined}
+              onChange={(e) => setExerciseStart(e.target.value)}
             />
           </label>
           <label className="stack" style={{ flex: 1 }}>
             <span className="hint">To</span>
             <input
               type="date"
-              value={end}
-              min={start || undefined}
-              onChange={(e) => setEnd(e.target.value)}
+              value={exerciseEnd}
+              min={exerciseStart || undefined}
+              onChange={(e) => setExerciseEnd(e.target.value)}
             />
           </label>
         </div>
@@ -146,13 +155,41 @@ export default function DataPage() {
             ))}
           </select>
         </label>
-        <button type="button" className="btn btn-block" onClick={exportCsv} disabled={busy}>
-          Export CSV
+        <button
+          type="button"
+          className="btn btn-block"
+          onClick={exportExerciseCsv}
+          disabled={busy}
+        >
+          Export Exercise CSV
         </button>
-        <p className="hint">
-          Two files for spreadsheets. Excludes deleted entries. Date and exercise filters
-          apply to both files; the exercise filter only narrows the exercise file.
-        </p>
+
+        <h3 className="hint">DDR CSV</h3>
+        <div className="row">
+          <label className="stack" style={{ flex: 1 }}>
+            <span className="hint">From</span>
+            <input
+              type="date"
+              value={ddrStart}
+              max={ddrEnd || undefined}
+              onChange={(e) => setDdrStart(e.target.value)}
+            />
+          </label>
+          <label className="stack" style={{ flex: 1 }}>
+            <span className="hint">To</span>
+            <input
+              type="date"
+              value={ddrEnd}
+              min={ddrStart || undefined}
+              onChange={(e) => setDdrEnd(e.target.value)}
+            />
+          </label>
+        </div>
+        <button type="button" className="btn btn-block" onClick={exportDdrCsv} disabled={busy}>
+          Export DDR CSV
+        </button>
+
+        <p className="hint">Both exclude deleted entries.</p>
       </section>
 
       <section className="card stack">

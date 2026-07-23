@@ -443,6 +443,12 @@ a:has(> .thumb):active .thumb {
   color: var(--muted);
 }
 
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
 .error {
   font-size: 0.85rem;
   color: var(--danger);

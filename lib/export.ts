@@ -81,9 +81,19 @@ export interface ExportFilter {
   exerciseTypeId?: string
 }
 
+/** performed_at is stored as a UTC instant, but the date-range filter is a
+ *  local calendar date (from an <input type="date">). Comparing against the
+ *  UTC slice would misfile entries near midnight for anyone west or east of
+ *  UTC, so convert to the device's local date first. */
+function localDateKey(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 function inDateRange(performedAt: string, filter?: ExportFilter): boolean {
   if (!filter) return true
-  const date = performedAt.slice(0, 10)
+  const date = localDateKey(performedAt)
   if (filter.start && date < filter.start) return false
   if (filter.end && date > filter.end) return false
   return true
