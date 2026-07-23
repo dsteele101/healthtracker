@@ -22,8 +22,10 @@ export const DDR_EXTRACTION_SCHEMA = {
         'The numeric foot rating (1-20), not the judgement counts or combo. Null if not visible.',
     },
     difficulty_scale: {
-      type: ['string', 'null'],
-      enum: ['old', 'new', null],
+      // Claude's structured-output schema compiler rejects `enum` combined
+      // with a `type` array — anyOf is the supported way to express a
+      // nullable enum.
+      anyOf: [{ type: 'string', enum: ['old', 'new'] }, { type: 'null' }],
       description:
         "'old' if the rating is on the 1-10 scale, 'new' if 1-20. Null if unclear.",
     },
