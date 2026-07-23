@@ -70,6 +70,25 @@ export async function buildExport(): Promise<ExportFile> {
   }
 }
 
+// --- filtering -----------------------------------------------------------------
+
+export interface ExportFilter {
+  /** Inclusive lower bound on performed_at, as a yyyy-mm-dd date. */
+  start?: string
+  /** Inclusive upper bound on performed_at, as a yyyy-mm-dd date. */
+  end?: string
+  /** Exercise CSV only: restrict to one exercise type. */
+  exerciseTypeId?: string
+}
+
+function inDateRange(performedAt: string, filter?: ExportFilter): boolean {
+  if (!filter) return true
+  const date = performedAt.slice(0, 10)
+  if (filter.start && date < filter.start) return false
+  if (filter.end && date > filter.end) return false
+  return true
+}
+
 // --- CSV ---------------------------------------------------------------------
 
 /** RFC 4180 quoting: wrap when the value contains a delimiter, quote, or
@@ -92,7 +111,7 @@ function csvRows(header: string[], rows: unknown[][]): string {
   return BOM + lines.join('\r\n') + '\r\n'
 }
 
-export async function buildExerciseCsv(): Promise<string> {
+export async function buildExerciseCsv(filter?: ExportFilter): Promise<string> {
   const [entries, types] = await Promise.all([
     local.all<ExerciseEntry>('exercise_entries'),
     local.all<ExerciseType>('exercise_types'),
@@ -103,7 +122,12 @@ export async function buildExerciseCsv(): Promise<string> {
   const nameOf = (id: string) =>
     allTypes.find((t) => t.id === id)?.name ?? types.find((t) => t.id === id)?.name ?? ''
 
-  const sorted = [...entries].sort((a, b) => a.performed_at.localeCompare(b.performed_at))
+  const filtered = entries.filter(
+    (e) =>
+      inDateRange(e.performed_at, filter) &&
+      (!filter?.exerciseTypeId || e.exercise_type_id === filter.exerciseTypeId),
+  )
+  const sorted = filtered.sort((a, b) => a.performed_at.localeCompare(b.performed_at))
 
   return csvRows(
     ['performed_at', 'exercise', 'sets', 'reps', 'duration_seconds', 'duration', 'weight', 'notes'],
@@ -122,9 +146,10 @@ export async function buildExerciseCsv(): Promise<string> {
   )
 }
 
-export async function buildDdrCsv(): Promise<string> {
+export async function buildDdrCsv(filter?: ExportFilter): Promise<string> {
   const entries = await local.all<DdrEntry>('ddr_entries')
-  const sorted = [...entries].sort((a, b) => a.performed_at.localeCompare(b.performed_at))
+  const filtered = entries.filter((d) => inDateRange(d.performed_at, filter))
+  const sorted = filtered.sort((a, b) => a.performed_at.localeCompare(b.performed_at))
 
   return csvRows(
     [

@@ -10,17 +10,24 @@ import {
   importExport,
   timestampedName,
 } from '@/lib/export'
-import { useDdrEntries, useExerciseEntries } from '@/lib/use-store'
+import { useDdrEntries, useExerciseEntries, useExerciseTypes } from '@/lib/use-store'
 import { SyncBadge } from '../components/sync-badge'
 
 export default function DataPage() {
   const exercises = useExerciseEntries()
   const ddr = useDdrEntries()
+  const exerciseTypes = useExerciseTypes()
   const fileInput = useRef<HTMLInputElement>(null)
 
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // CSV-only: JSON stays a full, unfiltered backup so it's always a safe
+  // restore target.
+  const [start, setStart] = useState('')
+  const [end, setEnd] = useState('')
+  const [exerciseTypeId, setExerciseTypeId] = useState('')
 
   async function run(label: string, action: () => Promise<string>) {
     setBusy(true)
@@ -49,9 +56,17 @@ export default function DataPage() {
 
   const exportCsv = () =>
     run('Export', async () => {
+      const filter = {
+        start: start || undefined,
+        end: end || undefined,
+        exerciseTypeId: exerciseTypeId || undefined,
+      }
       // Two files rather than one: the columns don't overlap, and flattening
       // them together would produce a sheet that's mostly empty cells.
-      const [exerciseCsv, ddrCsv] = await Promise.all([buildExerciseCsv(), buildDdrCsv()])
+      const [exerciseCsv, ddrCsv] = await Promise.all([
+        buildExerciseCsv(filter),
+        buildDdrCsv(filter),
+      ])
       download(timestampedName('healthtracker-exercise', 'csv'), exerciseCsv, 'text/csv')
       download(timestampedName('healthtracker-ddr', 'csv'), ddrCsv, 'text/csv')
       return 'Exported two CSV files: exercise and DDR.'
@@ -100,11 +115,43 @@ export default function DataPage() {
           Complete, including deletions. This is the file to keep as a backup and the
           one Import reads.
         </p>
+        <div className="row">
+          <label className="stack" style={{ flex: 1 }}>
+            <span className="hint">From</span>
+            <input
+              type="date"
+              value={start}
+              max={end || undefined}
+              onChange={(e) => setStart(e.target.value)}
+            />
+          </label>
+          <label className="stack" style={{ flex: 1 }}>
+            <span className="hint">To</span>
+            <input
+              type="date"
+              value={end}
+              min={start || undefined}
+              onChange={(e) => setEnd(e.target.value)}
+            />
+          </label>
+        </div>
+        <label className="stack">
+          <span className="hint">Exercise</span>
+          <select value={exerciseTypeId} onChange={(e) => setExerciseTypeId(e.target.value)}>
+            <option value="">All exercises</option>
+            {exerciseTypes?.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <button type="button" className="btn btn-block" onClick={exportCsv} disabled={busy}>
           Export CSV
         </button>
         <p className="hint">
-          Two files for spreadsheets. Excludes deleted entries.
+          Two files for spreadsheets. Excludes deleted entries. Date and exercise filters
+          apply to both files; the exercise filter only narrows the exercise file.
         </p>
       </section>
 
