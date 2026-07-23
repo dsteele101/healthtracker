@@ -179,6 +179,19 @@ export function extractDifficulty(
   return undefined
 }
 
+/**
+ * The difficulty name itself (BEGINNER, EXPERT, etc.), read straight off
+ * whichever line matched `DIFFICULTY_WORDS` while locating the number above —
+ * that match is otherwise discarded once the number's found.
+ */
+export function extractDifficultyType(lines: string[]): string | undefined {
+  for (const line of lines) {
+    const match = line.match(DIFFICULTY_WORDS)
+    if (match) return match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase()
+  }
+  return undefined
+}
+
 /** Song length, shown as m:ss on the results screen. */
 export function extractLength(text: string): number | undefined {
   for (const match of text.matchAll(/\b(\d{1,2}):([0-5]\d)\b/g)) {
@@ -216,12 +229,14 @@ export function parseDdrText(rawText: string, options: ParseOptions): ParseResul
   const songMatch = matchSong(lines, options.corpus)
   const score = extractScore(rawText)
   const difficulty = extractDifficulty(lines, options.scale)
+  const difficultyType = extractDifficultyType(lines)
   const length = extractLength(rawText)
 
   const fields: DdrFields = {}
   if (songMatch) fields.song_title = songMatch.title
   if (score !== undefined) fields.percentage_score = score
   if (difficulty !== undefined) fields.difficulty = difficulty
+  if (difficultyType !== undefined) fields.difficulty_type = difficultyType
   if (length !== undefined) fields.song_length_seconds = length
 
   const missing: (keyof DdrFields)[] = []

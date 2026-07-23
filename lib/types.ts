@@ -5,6 +5,9 @@ export type Iso = string
 
 export type DifficultyScale = 'old' | 'new'
 
+/** 1-10 before DDR X, 1-20 after. */
+export const MAX_DIFFICULTY: Record<DifficultyScale, number> = { old: 10, new: 20 }
+
 /** Fields every syncable row carries. */
 interface Syncable {
   id: string
@@ -42,10 +45,15 @@ export interface ExerciseEntry extends Syncable {
 
 export interface DdrEntry extends Syncable {
   song_title: string
+  /** The song's credited artist/composer, as printed on the results screen. */
+  artist: string | null
   /** Numeric foot rating; range depends on difficulty_scale. */
   difficulty: number
   /** 'old' = 1-10 scale, 'new' = 1-20 scale. */
   difficulty_scale: DifficultyScale
+  /** Difficulty name as printed (Beginner, Hard, Expert, etc.) — free text,
+   *  since it varies by game/theme rather than following one fixed set. */
+  difficulty_type: string | null
   song_length_seconds: number | null
   percentage_score: number
   photo_path: string | null

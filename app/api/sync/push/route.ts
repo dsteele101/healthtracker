@@ -49,14 +49,16 @@ const UPSERTS: Record<SyncTable, string> = {
   `,
   ddr_entries: `
     INSERT INTO ddr_entries
-      (id, song_title, difficulty, difficulty_scale, song_length_seconds,
-       percentage_score, photo_path, performed_at, session_id,
+      (id, song_title, artist, difficulty, difficulty_scale, difficulty_type,
+       song_length_seconds, percentage_score, photo_path, performed_at, session_id,
        created_at, updated_at, deleted_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     ON CONFLICT (id) DO UPDATE SET
       song_title          = EXCLUDED.song_title,
+      artist              = EXCLUDED.artist,
       difficulty          = EXCLUDED.difficulty,
       difficulty_scale    = EXCLUDED.difficulty_scale,
+      difficulty_type     = EXCLUDED.difficulty_type,
       song_length_seconds = EXCLUDED.song_length_seconds,
       percentage_score    = EXCLUDED.percentage_score,
       photo_path          = EXCLUDED.photo_path,
@@ -84,8 +86,8 @@ function params(table: SyncTable, row: Record<string, unknown>): unknown[] {
       ]
     case 'ddr_entries':
       return [
-        row.id, row.song_title, row.difficulty, row.difficulty_scale,
-        row.song_length_seconds, row.percentage_score, row.photo_path,
+        row.id, row.song_title, row.artist, row.difficulty, row.difficulty_scale,
+        row.difficulty_type, row.song_length_seconds, row.percentage_score, row.photo_path,
         row.performed_at, row.session_id, row.created_at, row.updated_at, row.deleted_at,
       ]
   }

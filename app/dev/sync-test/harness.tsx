@@ -52,8 +52,10 @@ function makeDdr(overrides: Partial<DdrEntry> = {}): DdrEntry {
   return {
     id: crypto.randomUUID(),
     song_title: 'Butterfly',
+    artist: null,
     difficulty: 8,
     difficulty_scale: 'old',
+    difficulty_type: null,
     song_length_seconds: 100,
     percentage_score: 91.5,
     photo_path: null,

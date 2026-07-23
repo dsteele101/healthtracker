@@ -15,9 +15,9 @@ const COLUMNS: Record<SyncTable, string> = {
     performed_at, session_id, created_at, updated_at, deleted_at, server_seq
   `,
   ddr_entries: `
-    id, song_title, difficulty, difficulty_scale, song_length_seconds,
-    percentage_score::float8 AS percentage_score, photo_path, performed_at,
-    session_id, created_at, updated_at, deleted_at, server_seq
+    id, song_title, artist, difficulty, difficulty_scale, difficulty_type,
+    song_length_seconds, percentage_score::float8 AS percentage_score, photo_path,
+    performed_at, session_id, created_at, updated_at, deleted_at, server_seq
   `,
 }
 

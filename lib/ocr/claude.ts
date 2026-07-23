@@ -1,5 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { DDR_EXTRACTION_SCHEMA, EXTRACTION_PROMPT, coerceExtraction } from './schema'
+import {
+  DDR_EXTRACTION_SCHEMA,
+  EXTRACTION_FIELD_COUNT,
+  EXTRACTION_PROMPT,
+  coerceExtraction,
+} from './schema'
 import type { ExtractionResult, OcrProvider } from './types'
 
 /* Haiku 4.5 by default: this is a short, well-specified extraction from a
@@ -65,7 +70,7 @@ export const claude: OcrProvider = {
       // Confidence stands in for how much of the screen was legible: the model
       // nulls what it cannot read, so the count of recovered fields is the
       // signal, not a number the model asserts about itself.
-      confidence: Object.keys(fields).length / 4,
+      confidence: Object.keys(fields).length / EXTRACTION_FIELD_COUNT,
       provider: 'claude',
     }
   },

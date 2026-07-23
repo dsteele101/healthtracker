@@ -1,10 +1,12 @@
 import type { DifficultyScale } from '../types'
 
-/** The five fields a DDR results screen can yield. */
+/** The fields a DDR results screen can yield. */
 export interface DdrFields {
   song_title?: string
+  artist?: string
   difficulty?: number
   difficulty_scale?: DifficultyScale
+  difficulty_type?: string
   song_length_seconds?: number
   percentage_score?: number
 }

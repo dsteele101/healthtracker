@@ -168,8 +168,10 @@ function validateDdrEntry(row: Row): Validated<DdrEntry> {
     return {
       id: uuid(row, 'id'),
       song_title: text(row, 'song_title', 300),
+      artist: textOrNull(row, 'artist', 300),
       difficulty,
       difficulty_scale: scale,
+      difficulty_type: textOrNull(row, 'difficulty_type', 60),
       song_length_seconds: intOrNull(row, 'song_length_seconds', 1, 3600),
       // Two decimals is what the results screen shows and what the column holds.
       percentage_score: Math.round(score * 100) / 100,

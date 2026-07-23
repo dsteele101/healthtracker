@@ -3,9 +3,22 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as local from '@/lib/local-db'
-import { formatDuration, formatWhen } from '@/lib/format'
+import {
+  formatDuration,
+  formatWhen,
+  fromDatetimeLocal,
+  parseDuration,
+  toDatetimeLocal,
+} from '@/lib/format'
 import { useDdrEntries, useExerciseEntries, useExerciseTypes } from '@/lib/use-store'
-import type { SyncTable } from '@/lib/types'
+import {
+  MAX_DIFFICULTY,
+  type DdrEntry,
+  type DifficultyScale,
+  type ExerciseEntry,
+  type ExerciseType,
+  type SyncTable,
+} from '@/lib/types'
 import { DEFAULT_EXERCISE_ICON } from '@/lib/exercise-icons'
 import { SyncBadge } from './components/sync-badge'
 import { DdrArrowIcon } from './components/ddr-arrow-icon'
@@ -30,6 +43,9 @@ interface TimelineItem {
   /** Exercise types carry their own icon; DDR falls back to a fixed arrow
    *  glyph, so this is only ever set for the exercise_entries branch. */
   icon: string | null
+  /** The underlying record, for editing — the fields above are a read-only
+   *  projection and don't carry enough to repopulate an edit form. */
+  raw: local.Local<DdrEntry> | local.Local<ExerciseEntry>
 }
 
 const KIND_LABELS: Record<KindFilter, string> = {
@@ -43,6 +59,525 @@ const KIND_LABELS: Record<KindFilter, string> = {
 // all of it — this only limits how many cards get mounted at once, so a
 // years-long history doesn't turn every home-page visit into a big DOM build.
 const PAGE_SIZE = 20
+
+/** Seconds to the m:ss (or h:mm:ss) text the length input expects. */
+function lengthToInput(seconds: number | null): string {
+  return seconds === null ? '' : formatDuration(seconds)
+}
+
+/** Edits a saved DDR entry in place. Read view matches the original
+ *  timeline card; edit view mirrors the fields and validation in
+ *  app/log/ddr/page.tsx, since this is the same record shape. */
+function DdrEntryRow({ item }: { item: TimelineItem }) {
+  const entry = item.raw as local.Local<DdrEntry>
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState(entry.song_title)
+  const [artist, setArtist] = useState(entry.artist ?? '')
+  const [scale, setScale] = useState<DifficultyScale>(entry.difficulty_scale)
+  const [difficulty, setDifficulty] = useState(String(entry.difficulty))
+  const [difficultyType, setDifficultyType] = useState(entry.difficulty_type ?? '')
+  const [score, setScore] = useState(String(entry.percentage_score))
+  const [length, setLength] = useState(lengthToInput(entry.song_length_seconds))
+  const [performedAt, setPerformedAt] = useState(toDatetimeLocal(entry.performed_at))
+  const [error, setError] = useState<string | null>(null)
+
+  function startEditing() {
+    setTitle(entry.song_title)
+    setArtist(entry.artist ?? '')
+    setScale(entry.difficulty_scale)
+    setDifficulty(String(entry.difficulty))
+    setDifficultyType(entry.difficulty_type ?? '')
+    setScore(String(entry.percentage_score))
+    setLength(lengthToInput(entry.song_length_seconds))
+    setPerformedAt(toDatetimeLocal(entry.performed_at))
+    setError(null)
+    setEditing(true)
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault()
+
+    const songTitle = title.trim()
+    if (!songTitle) return setError('Song title is required.')
+
+    const max = MAX_DIFFICULTY[scale]
+    const difficultyValue = Number(difficulty)
+    if (
+      !difficulty.trim() ||
+      !Number.isInteger(difficultyValue) ||
+      difficultyValue < 1 ||
+      difficultyValue > max
+    ) {
+      return setError(`Difficulty must be a whole number from 1 to ${max} on the ${scale} scale.`)
+    }
+
+    const scoreValue = Number(score)
+    if (!score.trim() || Number.isNaN(scoreValue) || scoreValue < 0 || scoreValue > 100) {
+      return setError('Score must be between 0 and 100.')
+    }
+
+    let lengthValue: number | null = null
+    if (length.trim()) {
+      const parsed = parseDuration(length)
+      if (parsed === null || parsed <= 0) {
+        return setError('Song length should look like 105 or 1:45.')
+      }
+      lengthValue = parsed
+    }
+
+    if (!performedAt) return setError('When is required.')
+
+    await local.put('ddr_entries', {
+      ...entry,
+      song_title: songTitle,
+      artist: artist.trim() || null,
+      difficulty: difficultyValue,
+      difficulty_scale: scale,
+      difficulty_type: difficultyType.trim() || null,
+      percentage_score: Math.round(scoreValue * 100) / 100,
+      song_length_seconds: lengthValue,
+      performed_at: fromDatetimeLocal(performedAt),
+      updated_at: new Date().toISOString(),
+    })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={save} className="card stack">
+        <div className="field">
+          <label className="label" htmlFor={`song-${entry.id}`}>
+            Song
+          </label>
+          <input
+            id={`song-${entry.id}`}
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value)
+              setError(null)
+            }}
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor={`artist-${entry.id}`}>
+            Artist
+          </label>
+          <input
+            id={`artist-${entry.id}`}
+            value={artist}
+            onChange={(e) => {
+              setArtist(e.target.value)
+              setError(null)
+            }}
+            placeholder="Optional"
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="field">
+          <span className="label">Difficulty scale</span>
+          <div className="row">
+            {(['old', 'new'] as const).map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`btn grow ${scale === option ? 'btn-primary' : ''}`}
+                aria-pressed={scale === option}
+                onClick={() => {
+                  setScale(option)
+                  setError(null)
+                }}
+              >
+                {option === 'old' ? 'Old (1–10)' : 'New (1–20)'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor={`difficulty-type-${entry.id}`}>
+            Difficulty type
+          </label>
+          <input
+            id={`difficulty-type-${entry.id}`}
+            value={difficultyType}
+            onChange={(e) => {
+              setDifficultyType(e.target.value)
+              setError(null)
+            }}
+            placeholder="Expert"
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="row">
+          <div className="field grow">
+            <label className="label" htmlFor={`difficulty-${entry.id}`}>
+              Difficulty
+            </label>
+            <input
+              id={`difficulty-${entry.id}`}
+              inputMode="numeric"
+              value={difficulty}
+              onChange={(e) => {
+                setDifficulty(e.target.value)
+                setError(null)
+              }}
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="field grow">
+            <label className="label" htmlFor={`score-${entry.id}`}>
+              Score %
+            </label>
+            <input
+              id={`score-${entry.id}`}
+              inputMode="decimal"
+              value={score}
+              onChange={(e) => {
+                setScore(e.target.value)
+                setError(null)
+              }}
+              autoComplete="off"
+            />
+          </div>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor={`length-${entry.id}`}>
+            Song length
+          </label>
+          <input
+            id={`length-${entry.id}`}
+            value={length}
+            onChange={(e) => {
+              setLength(e.target.value)
+              setError(null)
+            }}
+            placeholder="1:45"
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor={`when-${entry.id}`}>
+            When
+          </label>
+          <input
+            id={`when-${entry.id}`}
+            type="datetime-local"
+            value={performedAt}
+            onChange={(e) => setPerformedAt(e.target.value)}
+          />
+        </div>
+
+        {error && <p className="error">{error}</p>}
+
+        <div className="spread">
+          <button type="button" className="btn" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            Save
+          </button>
+        </div>
+      </form>
+    )
+  }
+
+  return (
+    <article className="card spread">
+      {item.photoPath ? (
+        <a href={`/api/photos/${item.photoPath}`} target="_blank" rel="noreferrer">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a
+              thumbnail doesn't need next/image's pipeline. */}
+          <img className="thumb thumb-ddr" src={`/api/photos/${item.photoPath}`} alt="" />
+        </a>
+      ) : (
+        <span className="thumb thumb-ddr thumb-fallback" aria-hidden="true">
+          <DdrArrowIcon />
+        </span>
+      )}
+      <div className="grow">
+        <div className="subtitle">{item.heading}</div>
+        {item.detail && <div className="muted mono">{item.detail}</div>}
+        <div className="muted mono">{formatWhen(item.performedAt)}</div>
+        {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
+      </div>
+
+      <div className="row">
+        {item.pending && <span className="pill">Unsaved</span>}
+        <button type="button" className="btn" aria-label={`Edit ${item.heading}`} onClick={startEditing}>
+          Edit
+        </button>
+        <button
+          type="button"
+          className="btn btn-danger"
+          aria-label={`Delete ${item.heading}`}
+          onClick={() => {
+            if (confirm('Delete this entry?')) {
+              void local.remove('ddr_entries', entry.id)
+            }
+          }}
+        >
+          Delete
+        </button>
+      </div>
+    </article>
+  )
+}
+
+/** Edits a saved exercise entry in place. Which fields the edit form shows
+ *  depends on the linked ExerciseType's tracks_reps/tracks_duration/
+ *  tracks_weight flags, mirroring app/log/exercise/page.tsx. */
+function ExerciseEntryRow({
+  item,
+  type,
+}: {
+  item: TimelineItem
+  type: local.Local<ExerciseType> | undefined
+}) {
+  const entry = item.raw as local.Local<ExerciseEntry>
+  const [editing, setEditing] = useState(false)
+  const [sets, setSets] = useState(String(entry.sets))
+  const [reps, setReps] = useState(entry.reps !== null ? String(entry.reps) : '')
+  const [duration, setDuration] = useState(lengthToInput(entry.duration_seconds))
+  const [weight, setWeight] = useState(entry.weight !== null ? String(entry.weight) : '')
+  const [notes, setNotes] = useState(entry.notes ?? '')
+  const [performedAt, setPerformedAt] = useState(toDatetimeLocal(entry.performed_at))
+  const [error, setError] = useState<string | null>(null)
+
+  function startEditing() {
+    setSets(String(entry.sets))
+    setReps(entry.reps !== null ? String(entry.reps) : '')
+    setDuration(lengthToInput(entry.duration_seconds))
+    setWeight(entry.weight !== null ? String(entry.weight) : '')
+    setNotes(entry.notes ?? '')
+    setPerformedAt(toDatetimeLocal(entry.performed_at))
+    setError(null)
+    setEditing(true)
+  }
+
+  async function save(event: React.FormEvent) {
+    event.preventDefault()
+    if (!type) return setError('This exercise no longer exists.')
+
+    const setsValue = Number(sets)
+    if (!Number.isInteger(setsValue) || setsValue < 1) {
+      return setError('Sets must be a whole number, at least 1.')
+    }
+
+    let repsValue: number | null = null
+    if (type.tracks_reps && reps.trim()) {
+      const parsed = Number(reps)
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        return setError('Reps must be a whole number.')
+      }
+      repsValue = parsed
+    }
+
+    let durationValue: number | null = null
+    if (type.tracks_duration && duration.trim()) {
+      const parsed = parseDuration(duration)
+      if (parsed === null) return setError('Time should look like 90, 1:30, or 1:02:03.')
+      durationValue = parsed
+    }
+
+    if (repsValue === null && durationValue === null && !notes.trim()) {
+      return setError('Add reps, a time, or a note.')
+    }
+
+    let weightValue: number | null = null
+    if (type.tracks_weight && weight.trim()) {
+      const parsed = Number(weight)
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        return setError('Weight must be a positive number.')
+      }
+      weightValue = Math.round(parsed * 100) / 100
+    }
+
+    if (!performedAt) return setError('When is required.')
+
+    await local.put('exercise_entries', {
+      ...entry,
+      sets: setsValue,
+      reps: repsValue,
+      duration_seconds: durationValue,
+      weight: weightValue,
+      notes: notes.trim() || null,
+      performed_at: fromDatetimeLocal(performedAt),
+      updated_at: new Date().toISOString(),
+    })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={save} className="card stack">
+        <div className="field">
+          <label className="label" htmlFor={`sets-${entry.id}`}>
+            Sets
+          </label>
+          <input
+            id={`sets-${entry.id}`}
+            inputMode="numeric"
+            value={sets}
+            onChange={(e) => {
+              setSets(e.target.value)
+              setError(null)
+            }}
+            autoComplete="off"
+          />
+        </div>
+
+        {type?.tracks_reps && (
+          <div className="field">
+            <label className="label" htmlFor={`reps-${entry.id}`}>
+              Reps
+            </label>
+            <input
+              id={`reps-${entry.id}`}
+              inputMode="numeric"
+              value={reps}
+              onChange={(e) => {
+                setReps(e.target.value)
+                setError(null)
+              }}
+              autoComplete="off"
+            />
+          </div>
+        )}
+
+        {type?.tracks_duration && (
+          <div className="field">
+            <label className="label" htmlFor={`duration-${entry.id}`}>
+              Time
+            </label>
+            <input
+              id={`duration-${entry.id}`}
+              value={duration}
+              onChange={(e) => {
+                setDuration(e.target.value)
+                setError(null)
+              }}
+              placeholder="1:30"
+              autoComplete="off"
+            />
+            <p className="hint">Seconds (90) or clock time (1:30).</p>
+          </div>
+        )}
+
+        {type?.tracks_weight && (
+          <div className="field">
+            <label className="label" htmlFor={`weight-${entry.id}`}>
+              Weight
+            </label>
+            <input
+              id={`weight-${entry.id}`}
+              inputMode="decimal"
+              value={weight}
+              onChange={(e) => {
+                setWeight(e.target.value)
+                setError(null)
+              }}
+              placeholder="Optional"
+              autoComplete="off"
+            />
+          </div>
+        )}
+
+        <div className="field">
+          <label className="label" htmlFor={`when-${entry.id}`}>
+            When
+          </label>
+          <input
+            id={`when-${entry.id}`}
+            type="datetime-local"
+            value={performedAt}
+            onChange={(e) => setPerformedAt(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor={`notes-${entry.id}`}>
+            Notes
+          </label>
+          <textarea
+            id={`notes-${entry.id}`}
+            value={notes}
+            onChange={(e) => {
+              setNotes(e.target.value)
+              setError(null)
+            }}
+            rows={2}
+            placeholder="Optional"
+            style={{ paddingTop: 10, paddingBottom: 10, minHeight: 66 }}
+          />
+        </div>
+
+        {error && <p className="error">{error}</p>}
+
+        <div className="spread">
+          <button type="button" className="btn" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+          <button type="submit" className="btn btn-primary">
+            Save
+          </button>
+        </div>
+      </form>
+    )
+  }
+
+  return (
+    <article className="card spread">
+      <span className="type-icon" aria-hidden="true">
+        {item.icon ?? DEFAULT_EXERCISE_ICON}
+      </span>
+      {item.exerciseTypeId ? (
+        <Link href={`/exercise/${item.exerciseTypeId}`} className="grow">
+          <div className="subtitle">{item.heading}</div>
+          {/* Metrics and timestamp on separate lines: joined into one they
+              wrap mid-date on a narrow phone, which reads as a mistake. */}
+          {item.detail && <div className="muted mono">{item.detail}</div>}
+          <div className="muted mono">{formatWhen(item.performedAt)}</div>
+          {item.note && <div className="muted">{item.note}</div>}
+          {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
+        </Link>
+      ) : (
+        <div className="grow">
+          <div className="subtitle">{item.heading}</div>
+          {item.detail && <div className="muted mono">{item.detail}</div>}
+          <div className="muted mono">{formatWhen(item.performedAt)}</div>
+          {item.note && <div className="muted">{item.note}</div>}
+          {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
+        </div>
+      )}
+
+      <div className="row">
+        {item.pending && <span className="pill">Unsaved</span>}
+        <button type="button" className="btn" aria-label={`Edit ${item.heading}`} onClick={startEditing}>
+          Edit
+        </button>
+        <button
+          type="button"
+          className="btn btn-danger"
+          aria-label={`Delete ${item.heading}`}
+          onClick={() => {
+            if (confirm('Delete this entry?')) {
+              void local.remove('exercise_entries', entry.id)
+            }
+          }}
+        >
+          Delete
+        </button>
+      </div>
+    </article>
+  )
+}
 
 export default function Home() {
   const exercises = useExerciseEntries()
@@ -80,17 +615,18 @@ export default function Home() {
       rejected: entry.rejected_reason,
       photoPath: null,
       icon: typeOf(entry.exercise_type_id)?.icon ?? null,
+      raw: entry,
     }))
 
     const fromDdr: TimelineItem[] = (ddr ?? []).map((entry) => ({
       id: entry.id,
       table: 'ddr_entries',
       exerciseTypeId: null,
-      heading: entry.song_title,
+      heading: entry.artist ? `${entry.song_title} — ${entry.artist}` : entry.song_title,
       detail: [
         // The scale is shown alongside the rating because a bare "16" means
         // different things on the 1-10 and 1-20 scales.
-        `Lv ${entry.difficulty} (${entry.difficulty_scale})`,
+        `${entry.difficulty_type ? `${entry.difficulty_type} ` : ''}Lv ${entry.difficulty} (${entry.difficulty_scale})`,
         `${entry.percentage_score}%`,
         entry.song_length_seconds !== null && formatDuration(entry.song_length_seconds),
       ]
@@ -102,6 +638,7 @@ export default function Home() {
       rejected: entry.rejected_reason,
       photoPath: entry.photo_path,
       icon: null,
+      raw: entry,
     }))
 
     return [...fromExercise, ...fromDdr].sort((a, b) =>
@@ -351,62 +888,17 @@ export default function Home() {
           <div className="empty">No entries match your filters.</div>
         )}
 
-        {visibleItems.map((item) => (
-          <article key={item.id} className="card spread">
-            {item.table === 'ddr_entries' &&
-              (item.photoPath ? (
-                <a href={`/api/photos/${item.photoPath}`} target="_blank" rel="noreferrer">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- a
-                      thumbnail doesn't need next/image's pipeline. */}
-                  <img className="thumb thumb-ddr" src={`/api/photos/${item.photoPath}`} alt="" />
-                </a>
-              ) : (
-                <span className="thumb thumb-ddr thumb-fallback" aria-hidden="true">
-                  <DdrArrowIcon />
-                </span>
-              ))}
-            {item.table === 'exercise_entries' && (
-              <span className="type-icon" aria-hidden="true">
-                {item.icon ?? DEFAULT_EXERCISE_ICON}
-              </span>
-            )}
-            {item.table === 'exercise_entries' && item.exerciseTypeId ? (
-              <Link href={`/exercise/${item.exerciseTypeId}`} className="grow">
-                <div className="subtitle">{item.heading}</div>
-                {/* Metrics and timestamp on separate lines: joined into one they
-                    wrap mid-date on a narrow phone, which reads as a mistake. */}
-                {item.detail && <div className="muted mono">{item.detail}</div>}
-                <div className="muted mono">{formatWhen(item.performedAt)}</div>
-                {item.note && <div className="muted">{item.note}</div>}
-                {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
-              </Link>
-            ) : (
-              <div className="grow">
-                <div className="subtitle">{item.heading}</div>
-                {item.detail && <div className="muted mono">{item.detail}</div>}
-                <div className="muted mono">{formatWhen(item.performedAt)}</div>
-                {item.note && <div className="muted">{item.note}</div>}
-                {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
-              </div>
-            )}
-
-            <div className="row">
-              {item.pending && <span className="pill">Unsaved</span>}
-              <button
-                type="button"
-                className="btn btn-danger"
-                aria-label={`Delete ${item.heading}`}
-                onClick={() => {
-                  if (confirm('Delete this entry?')) {
-                    void local.remove(item.table, item.id)
-                  }
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          </article>
-        ))}
+        {visibleItems.map((item) =>
+          item.table === 'ddr_entries' ? (
+            <DdrEntryRow key={item.id} item={item} />
+          ) : (
+            <ExerciseEntryRow
+              key={item.id}
+              item={item}
+              type={types?.find((t) => t.id === item.exerciseTypeId)}
+            />
+          ),
+        )}
 
         {hasMore && (
           <>

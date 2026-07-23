@@ -117,8 +117,10 @@ export async function buildDdrCsv(): Promise<string> {
     [
       'performed_at',
       'song_title',
+      'artist',
       'difficulty',
       'difficulty_scale',
+      'difficulty_type',
       'percentage_score',
       'song_length_seconds',
       'song_length',
@@ -126,8 +128,10 @@ export async function buildDdrCsv(): Promise<string> {
     sorted.map((d) => [
       d.performed_at,
       d.song_title,
+      d.artist,
       d.difficulty,
       d.difficulty_scale,
+      d.difficulty_type,
       d.percentage_score,
       d.song_length_seconds,
       d.song_length_seconds === null ? '' : formatDuration(d.song_length_seconds),

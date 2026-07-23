@@ -5,16 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import * as local from '@/lib/local-db'
 import { fromDatetimeLocal, parseDuration, toDatetimeLocal } from '@/lib/format'
-import { useSongs } from '@/lib/use-store'
+import { useDdrEntries, useSongs } from '@/lib/use-store'
 import type { DdrFields } from '@/lib/ocr'
-import type { DdrEntry, DifficultyScale } from '@/lib/types'
+import { MAX_DIFFICULTY, type DdrEntry, type DifficultyScale } from '@/lib/types'
 import { SyncBadge } from '../../components/sync-badge'
 import { PhotoImport } from './photo-import'
 
 const LAST_SCALE_KEY = 'tracker:last-difficulty-scale'
-
-/** 1-10 before DDR X, 1-20 after. */
-const MAX_DIFFICULTY: Record<DifficultyScale, number> = { old: 10, new: 20 }
 
 function readLastScale(): DifficultyScale {
   if (typeof window === 'undefined') return 'new'
@@ -25,6 +22,14 @@ function readLastScale(): DifficultyScale {
 export default function LogDdrPage() {
   const router = useRouter()
   const songs = useSongs()
+  const ddrEntries = useDdrEntries()
+
+  // Distinct difficulty-type names seen before, for the suggestion list —
+  // there's no dedicated corpus for these like there is for song titles, so
+  // it's derived straight from history.
+  const difficultyTypes = [
+    ...new Set((ddrEntries ?? []).map((e) => e.difficulty_type).filter((t): t is string => !!t)),
+  ].sort((a, b) => a.localeCompare(b))
 
   // Same reasoning as the exercise form: this page is prerendered, so a
   // timestamp computed anywhere but the browser would be the build date.
@@ -35,7 +40,9 @@ export default function LogDdrPage() {
   const [scale, setScale] = useState<DifficultyScale>(readLastScale)
 
   const [title, setTitle] = useState('')
+  const [artist, setArtist] = useState('')
   const [difficulty, setDifficulty] = useState('')
+  const [difficultyType, setDifficultyType] = useState('')
   const [length, setLength] = useState('')
   const [score, setScore] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -51,7 +58,9 @@ export default function LogDdrPage() {
    *  manual entry rather than blanking what's already typed. */
   function applyImportedFields(fields: DdrFields, note: string) {
     if (fields.song_title !== undefined) setTitle(fields.song_title)
+    if (fields.artist !== undefined) setArtist(fields.artist)
     if (fields.difficulty !== undefined) setDifficulty(String(fields.difficulty))
+    if (fields.difficulty_type !== undefined) setDifficultyType(fields.difficulty_type)
     if (fields.percentage_score !== undefined) setScore(String(fields.percentage_score))
     if (fields.song_length_seconds !== undefined) {
       const total = fields.song_length_seconds
@@ -100,8 +109,10 @@ export default function LogDdrPage() {
     const entry: DdrEntry = {
       id: crypto.randomUUID(),
       song_title: songTitle,
+      artist: artist.trim() || null,
       difficulty: difficultyValue,
       difficulty_scale: scale,
+      difficulty_type: difficultyType.trim() || null,
       song_length_seconds: lengthValue,
       // Two decimals is what the results screen shows.
       percentage_score: Math.round(scoreValue * 100) / 100,
@@ -166,6 +177,22 @@ export default function LogDdrPage() {
         </div>
 
         <div className="field">
+          <label className="label" htmlFor="artist">
+            Artist
+          </label>
+          <input
+            id="artist"
+            value={artist}
+            onChange={(e) => {
+              setArtist(e.target.value)
+              clearError()
+            }}
+            placeholder="Optional"
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="field">
           <span className="label">Difficulty scale</span>
           <div className="row">
             {(['old', 'new'] as const).map((option) => (
@@ -183,6 +210,28 @@ export default function LogDdrPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="field">
+          <label className="label" htmlFor="difficulty-type">
+            Difficulty type
+          </label>
+          <input
+            id="difficulty-type"
+            list="difficulty-type-suggestions"
+            value={difficultyType}
+            onChange={(e) => {
+              setDifficultyType(e.target.value)
+              clearError()
+            }}
+            placeholder="Expert"
+            autoComplete="off"
+          />
+          <datalist id="difficulty-type-suggestions">
+            {difficultyTypes.map((type) => (
+              <option key={type} value={type} />
+            ))}
+          </datalist>
         </div>
 
         <div className="row">

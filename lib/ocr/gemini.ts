@@ -1,4 +1,9 @@
-import { DDR_EXTRACTION_SCHEMA, EXTRACTION_PROMPT, coerceExtraction } from './schema'
+import {
+  DDR_EXTRACTION_SCHEMA,
+  EXTRACTION_FIELD_COUNT,
+  EXTRACTION_PROMPT,
+  coerceExtraction,
+} from './schema'
 import type { ExtractionResult, OcrProvider } from './types'
 
 /* Model IDs on the Gemini API move faster than most, so this is configurable
@@ -15,8 +20,10 @@ const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models'
 function toGeminiSchema() {
   const properties: Record<string, unknown> = {
     song_title: { type: 'STRING', nullable: true },
+    artist: { type: 'STRING', nullable: true },
     difficulty: { type: 'INTEGER', nullable: true },
     difficulty_scale: { type: 'STRING', enum: ['old', 'new'], nullable: true },
+    difficulty_type: { type: 'STRING', nullable: true },
     percentage_score: { type: 'NUMBER', nullable: true },
     song_length_seconds: { type: 'INTEGER', nullable: true },
   }
@@ -90,7 +97,7 @@ export const gemini: OcrProvider = {
 
     return {
       fields,
-      confidence: Object.keys(fields).length / 4,
+      confidence: Object.keys(fields).length / EXTRACTION_FIELD_COUNT,
       provider: 'gemini',
     }
   },
