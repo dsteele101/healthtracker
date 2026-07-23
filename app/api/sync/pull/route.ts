@@ -19,6 +19,13 @@ const COLUMNS: Record<SyncTable, string> = {
     song_length_seconds, percentage_score::float8 AS percentage_score, photo_path,
     performed_at, session_id, created_at, updated_at, deleted_at, server_seq
   `,
+  workout_templates: `
+    id, name, items, created_at, updated_at, deleted_at, server_seq
+  `,
+  workout_sessions: `
+    id, name, template_id, started_at, ended_at, notes,
+    created_at, updated_at, deleted_at, server_seq
+  `,
 }
 
 type SeqRow = Record<string, unknown> & { server_seq: string }

@@ -5,6 +5,7 @@ import "@fontsource/rajdhani/latin-500.css";
 import "@fontsource/rajdhani/latin-600.css";
 import "@fontsource/rajdhani/latin-700.css";
 import "./globals.css";
+import { ActiveSessionBar } from "./components/active-session-bar";
 import { ServiceWorkerRegistration } from "./service-worker-registration";
 
 export const metadata: Metadata = {
@@ -44,6 +45,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <ActiveSessionBar />
         {children}
         <ServiceWorkerRegistration />
       </body>

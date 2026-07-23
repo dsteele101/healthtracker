@@ -122,6 +122,23 @@ textarea:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
+/* --- active session ---------------------------------------------------------- */
+
+/* First child of body, ahead of .page, so `position: sticky` pins it to the
+   viewport top as the page scrolls without needing a fixed-position offset
+   hack anywhere else. */
+.active-session-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
 /* --- layout ---------------------------------------------------------------- */
 
 .page {
@@ -202,6 +219,17 @@ textarea:focus-visible {
     background: color-mix(in srgb, var(--accent) 8%, var(--surface));
     border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   }
+}
+
+/* A grouped session on the timeline: a <details> wrapping its member cards,
+   so the disclosure triangle doesn't need its own JS state. */
+.session-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.session-summary::-webkit-details-marker {
+  display: none;
 }
 
 .empty {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import * as local from '@/lib/local-db'
 import { fromDatetimeLocal, parseDuration, toDatetimeLocal } from '@/lib/format'
-import { useDdrEntries, useSongs } from '@/lib/use-store'
+import { useActiveSession, useDdrEntries, useSongs } from '@/lib/use-store'
 import type { DdrFields } from '@/lib/ocr'
 import { MAX_DIFFICULTY, type DdrEntry, type DifficultyScale } from '@/lib/types'
 import { SyncBadge } from '../../components/sync-badge'
@@ -23,6 +23,7 @@ export default function LogDdrPage() {
   const router = useRouter()
   const songs = useSongs()
   const ddrEntries = useDdrEntries()
+  const activeSession = useActiveSession()
 
   // Distinct difficulty-type names seen before, for the suggestion list —
   // there's no dedicated corpus for these like there is for song titles, so
@@ -118,7 +119,7 @@ export default function LogDdrPage() {
       percentage_score: Math.round(scoreValue * 100) / 100,
       photo_path: null,
       performed_at: performedAt ? fromDatetimeLocal(performedAt) : now,
-      session_id: null,
+      session_id: activeSession?.id ?? null,
       created_at: now,
       updated_at: now,
       deleted_at: null,

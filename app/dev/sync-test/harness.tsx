@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react'
 import * as local from '@/lib/local-db'
 import { pendingCount, sync } from '@/lib/sync'
-import type { DdrEntry, ExerciseEntry, ExerciseType } from '@/lib/types'
+import type {
+  DdrEntry,
+  ExerciseEntry,
+  ExerciseType,
+  WorkoutSession,
+  WorkoutTemplate,
+} from '@/lib/types'
 
 interface Result {
   label: string
@@ -41,6 +47,33 @@ function makeEntry(typeId: string, overrides: Partial<ExerciseEntry> = {}): Exer
     notes: null,
     performed_at: iso(),
     session_id: null,
+    created_at: iso(),
+    updated_at: iso(),
+    deleted_at: null,
+    ...overrides,
+  }
+}
+
+function makeTemplate(overrides: Partial<WorkoutTemplate> = {}): WorkoutTemplate {
+  return {
+    id: crypto.randomUUID(),
+    name: `Routine ${crypto.randomUUID().slice(0, 8)}`,
+    items: [],
+    created_at: iso(),
+    updated_at: iso(),
+    deleted_at: null,
+    ...overrides,
+  }
+}
+
+function makeSession(overrides: Partial<WorkoutSession> = {}): WorkoutSession {
+  return {
+    id: crypto.randomUUID(),
+    name: null,
+    template_id: null,
+    started_at: iso(),
+    ended_at: null,
+    notes: null,
     created_at: iso(),
     updated_at: iso(),
     deleted_at: null,
@@ -100,6 +133,8 @@ async function runTests(): Promise<Result[]> {
   // --- last-write-wins on merge --------------------------------------------
   await local.mergeFromServer({
     exercise_types: [{ ...type, name: 'NEWER FROM SERVER', updated_at: iso(60_000) }],
+    workout_templates: [],
+    workout_sessions: [],
     exercise_entries: [],
     ddr_entries: [],
   })
@@ -108,6 +143,8 @@ async function runTests(): Promise<Result[]> {
 
   await local.mergeFromServer({
     exercise_types: [{ ...type, name: 'STALE FROM SERVER', updated_at: iso(-60_000) }],
+    workout_templates: [],
+    workout_sessions: [],
     exercise_entries: [],
     ddr_entries: [],
   })
@@ -119,6 +156,8 @@ async function runTests(): Promise<Result[]> {
   await local.put('exercise_types', { ...type, name: 'LOCAL EDIT', updated_at: iso() })
   await local.mergeFromServer({
     exercise_types: [{ ...type, name: 'SERVER WINS?', updated_at: iso(120_000) }],
+    workout_templates: [],
+    workout_sessions: [],
     exercise_entries: [],
     ddr_entries: [],
   })
@@ -186,10 +225,45 @@ async function runTests(): Promise<Result[]> {
   await local.put('exercise_types', freshType)
   await local.put('ddr_entries', makeDdr({ song_title: 'ROUNDTRIP SONG' }))
 
+  // A template, a session started from it, and entries of both kinds logged
+  // under that session -- all pushed in the same batch, so this also exercises
+  // the SYNC_TABLES push ordering (templates -> sessions -> entries) that
+  // keeps a fresh, never-before-seen chain from tripping the FK constraints.
+  const roundtripTemplate = makeTemplate({
+    name: `Roundtrip Routine ${crypto.randomUUID().slice(0, 8)}`,
+    items: [
+      {
+        exercise_type_id: freshType.id,
+        target_sets: 3,
+        target_reps: 10,
+        target_duration_seconds: null,
+        notes: null,
+      },
+    ],
+  })
+  await local.put('workout_templates', roundtripTemplate)
+
+  const roundtripSession = makeSession({
+    name: 'Roundtrip Session',
+    template_id: roundtripTemplate.id,
+  })
+  await local.put('workout_sessions', roundtripSession)
+
+  const sessionEntry = makeEntry(freshType.id, {
+    notes: 'roundtrip session entry',
+    session_id: roundtripSession.id,
+  })
+  await local.put('exercise_entries', sessionEntry)
+
   const outcome = await sync()
   check(
     'sync() reports success',
     outcome.status === 'synced',
+    JSON.stringify(outcome),
+  )
+  check(
+    'sync() reports no rejected rows',
+    outcome.status === 'synced' && outcome.rejected === 0,
     JSON.stringify(outcome),
   )
   check('sync() drains the outbox', (await pendingCount()) === 0)
@@ -218,6 +292,34 @@ async function runTests(): Promise<Result[]> {
   check(
     'pulled rows are not marked pending',
     pulledDdr.every((d) => d.pending === 0),
+  )
+
+  const pulledTemplates = await local.all<WorkoutTemplate>('workout_templates')
+  const pulledTemplate = pulledTemplates.find((t) => t.id === roundtripTemplate.id)
+  check('workout template arrives on the second device', pulledTemplate !== undefined)
+  check(
+    'workout template items survive the jsonb round trip',
+    pulledTemplate?.items.length === 1 &&
+      pulledTemplate.items[0].exercise_type_id === freshType.id &&
+      pulledTemplate.items[0].target_sets === 3,
+    JSON.stringify(pulledTemplate?.items),
+  )
+
+  const pulledSessions = await local.all<WorkoutSession>('workout_sessions')
+  const pulledSession = pulledSessions.find((s) => s.id === roundtripSession.id)
+  check('workout session arrives on the second device', pulledSession !== undefined)
+  check(
+    'workout session keeps its template link',
+    pulledSession?.template_id === roundtripTemplate.id,
+    pulledSession?.template_id ?? 'null',
+  )
+
+  const pulledEntries = await local.all<ExerciseEntry>('exercise_entries')
+  const pulledSessionEntry = pulledEntries.find((e) => e.id === sessionEntry.id)
+  check(
+    'exercise entry keeps its session link',
+    pulledSessionEntry?.session_id === roundtripSession.id,
+    pulledSessionEntry?.session_id ?? 'null',
   )
 
   return results

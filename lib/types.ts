@@ -68,9 +68,38 @@ export interface DdrSong {
   created_at: Iso
 }
 
-/** The three tables that participate in sync, keyed by store name. */
+/** One planned exercise within a WorkoutTemplate. No identity of its own —
+ *  it only ever exists as part of the template's `items` array. */
+export interface WorkoutTemplateItem {
+  exercise_type_id: string
+  target_sets: number | null
+  target_reps: number | null
+  target_duration_seconds: number | null
+  notes: string | null
+}
+
+/** A reusable named routine (e.g. "Leg Day") a session can be started from. */
+export interface WorkoutTemplate extends Syncable {
+  name: string
+  items: WorkoutTemplateItem[]
+}
+
+/** A grouping of entries logged together, optionally started from a template.
+ *  `ended_at === null` means it's still in progress -- the only signal
+ *  "active session" needs, so there's no separate status flag anywhere. */
+export interface WorkoutSession extends Syncable {
+  name: string | null
+  template_id: string | null
+  started_at: Iso
+  ended_at: Iso | null
+  notes: string | null
+}
+
+/** The five tables that participate in sync, keyed by store name. */
 export interface SyncPayload {
   exercise_types: ExerciseType[]
+  workout_templates: WorkoutTemplate[]
+  workout_sessions: WorkoutSession[]
   exercise_entries: ExerciseEntry[]
   ddr_entries: DdrEntry[]
 }
@@ -79,8 +108,12 @@ export type SyncTable = keyof SyncPayload
 
 export const SYNC_TABLES: SyncTable[] = [
   // Order matters on push: entries carry a foreign key to types, so a type has
-  // to land before an entry that references it.
+  // to land before an entry that references it. Same reasoning chains
+  // templates -> sessions -> entries: a session may reference a template, and
+  // an entry may reference a session.
   'exercise_types',
+  'workout_templates',
+  'workout_sessions',
   'exercise_entries',
   'ddr_entries',
 ]
@@ -98,5 +131,11 @@ export interface PushResponse {
 }
 
 export function emptyPayload(): SyncPayload {
-  return { exercise_types: [], exercise_entries: [], ddr_entries: [] }
+  return {
+    exercise_types: [],
+    workout_templates: [],
+    workout_sessions: [],
+    exercise_entries: [],
+    ddr_entries: [],
+  }
 }

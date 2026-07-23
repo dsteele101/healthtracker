@@ -4,7 +4,15 @@
  * changes and partial writes. A malformed row should be reported back and
  * quarantined, not written or silently dropped. */
 
-import type { DdrEntry, ExerciseEntry, ExerciseType, SyncTable } from './types'
+import type {
+  DdrEntry,
+  ExerciseEntry,
+  ExerciseType,
+  SyncTable,
+  WorkoutSession,
+  WorkoutTemplate,
+  WorkoutTemplateItem,
+} from './types'
 
 export type Validated<T> = { ok: true; value: T } | { ok: false; reason: string }
 
@@ -185,8 +193,61 @@ function validateDdrEntry(row: Row): Validated<DdrEntry> {
   })
 }
 
+function workoutTemplateItems(row: Row): WorkoutTemplateItem[] {
+  const value = row.items
+  if (!Array.isArray(value)) throw new Error('items must be an array')
+  // Bounds a single template's payload size; well above any plausible routine.
+  if (value.length > 50) throw new Error('items exceeds 50 entries')
+
+  return value.map((raw, index) => {
+    if (typeof raw !== 'object' || raw === null) {
+      throw new Error(`items[${index}] must be an object`)
+    }
+    const item = raw as Row
+    try {
+      return {
+        exercise_type_id: uuid(item, 'exercise_type_id'),
+        target_sets: intOrNull(item, 'target_sets', 1, 1000),
+        target_reps: intOrNull(item, 'target_reps', 0, 100_000),
+        target_duration_seconds: intOrNull(item, 'target_duration_seconds', 0, 86_400),
+        notes: textOrNull(item, 'notes', 2000),
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'invalid item'
+      throw new Error(`items[${index}]: ${message}`)
+    }
+  })
+}
+
+function validateWorkoutTemplate(row: Row): Validated<WorkoutTemplate> {
+  return wrap(() => ({
+    id: uuid(row, 'id'),
+    name: text(row, 'name', 120),
+    items: workoutTemplateItems(row),
+    created_at: iso(row, 'created_at'),
+    updated_at: iso(row, 'updated_at'),
+    deleted_at: isoOrNull(row, 'deleted_at'),
+  }))
+}
+
+function validateWorkoutSession(row: Row): Validated<WorkoutSession> {
+  return wrap(() => ({
+    id: uuid(row, 'id'),
+    name: textOrNull(row, 'name', 200),
+    template_id: uuidOrNull(row, 'template_id'),
+    started_at: iso(row, 'started_at'),
+    ended_at: isoOrNull(row, 'ended_at'),
+    notes: textOrNull(row, 'notes', 2000),
+    created_at: iso(row, 'created_at'),
+    updated_at: iso(row, 'updated_at'),
+    deleted_at: isoOrNull(row, 'deleted_at'),
+  }))
+}
+
 const VALIDATORS = {
   exercise_types: validateExerciseType,
+  workout_templates: validateWorkoutTemplate,
+  workout_sessions: validateWorkoutSession,
   exercise_entries: validateExerciseEntry,
   ddr_entries: validateDdrEntry,
 } as const

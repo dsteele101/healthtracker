@@ -69,6 +69,33 @@ const UPSERTS: Record<SyncTable, string> = {
       server_seq          = nextval('sync_seq')
     WHERE ddr_entries.updated_at < EXCLUDED.updated_at
   `,
+  workout_templates: `
+    INSERT INTO workout_templates
+      (id, name, items, created_at, updated_at, deleted_at)
+    VALUES ($1, $2, $3::jsonb, $4, $5, $6)
+    ON CONFLICT (id) DO UPDATE SET
+      name       = EXCLUDED.name,
+      items      = EXCLUDED.items,
+      updated_at = EXCLUDED.updated_at,
+      deleted_at = EXCLUDED.deleted_at,
+      server_seq = nextval('sync_seq')
+    WHERE workout_templates.updated_at < EXCLUDED.updated_at
+  `,
+  workout_sessions: `
+    INSERT INTO workout_sessions
+      (id, name, template_id, started_at, ended_at, notes, created_at, updated_at, deleted_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    ON CONFLICT (id) DO UPDATE SET
+      name        = EXCLUDED.name,
+      template_id = EXCLUDED.template_id,
+      started_at  = EXCLUDED.started_at,
+      ended_at    = EXCLUDED.ended_at,
+      notes       = EXCLUDED.notes,
+      updated_at  = EXCLUDED.updated_at,
+      deleted_at  = EXCLUDED.deleted_at,
+      server_seq  = nextval('sync_seq')
+    WHERE workout_sessions.updated_at < EXCLUDED.updated_at
+  `,
 }
 
 function params(table: SyncTable, row: Record<string, unknown>): unknown[] {
@@ -89,6 +116,17 @@ function params(table: SyncTable, row: Record<string, unknown>): unknown[] {
         row.id, row.song_title, row.artist, row.difficulty, row.difficulty_scale,
         row.difficulty_type, row.song_length_seconds, row.percentage_score, row.photo_path,
         row.performed_at, row.session_id, row.created_at, row.updated_at, row.deleted_at,
+      ]
+    case 'workout_templates':
+      // pg does not serialize array/object params for jsonb columns itself.
+      return [
+        row.id, row.name, JSON.stringify(row.items), row.created_at, row.updated_at,
+        row.deleted_at,
+      ]
+    case 'workout_sessions':
+      return [
+        row.id, row.name, row.template_id, row.started_at, row.ended_at, row.notes,
+        row.created_at, row.updated_at, row.deleted_at,
       ]
   }
 }

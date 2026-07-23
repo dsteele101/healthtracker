@@ -6,7 +6,14 @@
 
 import * as local from './local-db'
 import { formatDuration } from './format'
-import type { DdrEntry, DdrSong, ExerciseEntry, ExerciseType } from './types'
+import type {
+  DdrEntry,
+  DdrSong,
+  ExerciseEntry,
+  ExerciseType,
+  WorkoutSession,
+  WorkoutTemplate,
+} from './types'
 
 export const EXPORT_FORMAT = 'healthtracker-export'
 export const EXPORT_VERSION = 1
@@ -16,6 +23,8 @@ export interface ExportFile {
   version: number
   exported_at: string
   exercise_types: ExerciseType[]
+  workout_templates: WorkoutTemplate[]
+  workout_sessions: WorkoutSession[]
   exercise_entries: ExerciseEntry[]
   ddr_entries: DdrEntry[]
   ddr_songs: DdrSong[]
@@ -39,8 +48,10 @@ export async function buildExport(): Promise<ExportFile> {
    * that still holds a deleted row would silently bring it back — the restore
    * has no way to say "this was removed" and the surviving copy wins on the
    * next sync. A backup that resurrects deleted data isn't a backup. */
-  const [types, exercises, ddr, songs] = await Promise.all([
+  const [types, templates, sessions, exercises, ddr, songs] = await Promise.all([
     local.allIncludingDeleted<ExerciseType>('exercise_types'),
+    local.allIncludingDeleted<WorkoutTemplate>('workout_templates'),
+    local.allIncludingDeleted<WorkoutSession>('workout_sessions'),
     local.allIncludingDeleted<ExerciseEntry>('exercise_entries'),
     local.allIncludingDeleted<DdrEntry>('ddr_entries'),
     local.songs(),
@@ -51,6 +62,8 @@ export async function buildExport(): Promise<ExportFile> {
     version: EXPORT_VERSION,
     exported_at: new Date().toISOString(),
     exercise_types: clean(types),
+    workout_templates: clean(templates),
+    workout_sessions: clean(sessions),
     exercise_entries: clean(exercises),
     ddr_entries: clean(ddr),
     ddr_songs: songs,
@@ -199,6 +212,8 @@ export async function importExport(text: string): Promise<ImportResult> {
 
   const tables = [
     ['exercise_types', file.exercise_types],
+    ['workout_templates', file.workout_templates],
+    ['workout_sessions', file.workout_sessions],
     ['exercise_entries', file.exercise_entries],
     ['ddr_entries', file.ddr_entries],
   ] as const

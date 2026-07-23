@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import * as local from './local-db'
 import { startAutoSync, pendingCount, sync, type SyncOutcome } from './sync'
-import type { DdrEntry, DdrSong, ExerciseEntry, ExerciseType } from './types'
+import type {
+  DdrEntry,
+  DdrSong,
+  ExerciseEntry,
+  ExerciseType,
+  SyncTable,
+  WorkoutSession,
+  WorkoutTemplate,
+} from './types'
 
 /** Re-renders whenever anything in the local store changes. */
 function useStoreVersion(): number {
@@ -18,7 +26,7 @@ function useStoreVersion(): number {
 
 /** Loads a table, re-reading on every local change. */
 function useTable<T extends { deleted_at: string | null }>(
-  table: 'exercise_types' | 'exercise_entries' | 'ddr_entries',
+  table: SyncTable,
 ): local.Local<T>[] | undefined {
   const version = useStoreVersion()
   const [rows, setRows] = useState<local.Local<T>[]>()
@@ -55,6 +63,29 @@ export function useExerciseEntries(): local.Local<ExerciseEntry>[] | undefined {
 export function useDdrEntries(): local.Local<DdrEntry>[] | undefined {
   const rows = useTable<DdrEntry>('ddr_entries')
   return rows?.sort((a, b) => b.performed_at.localeCompare(a.performed_at))
+}
+
+/** Workout templates (routines), alphabetical -- mirrors useExerciseTypes(). */
+export function useWorkoutTemplates(): local.Local<WorkoutTemplate>[] | undefined {
+  const rows = useTable<WorkoutTemplate>('workout_templates')
+  return rows?.sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/** Workout sessions, most recently started first — so the active one (if any)
+ *  leads and "recent sessions" reads naturally on a picker. */
+export function useWorkoutSessions(): local.Local<WorkoutSession>[] | undefined {
+  const rows = useTable<WorkoutSession>('workout_sessions')
+  return rows?.sort((a, b) => b.started_at.localeCompare(a.started_at))
+}
+
+/** The session in progress right now, if any -- derived from the data rather
+ *  than a separate client-only flag, so it's already synced and can never
+ *  drift from the row it describes. `ended_at === null` is the only signal:
+ *  see 010_workout_sessions.sql. Most-recently-started wins if more than one
+ *  device left a session open at once. */
+export function useActiveSession(): local.Local<WorkoutSession> | undefined {
+  const sessions = useWorkoutSessions()
+  return sessions?.find((session) => session.ended_at === null)
 }
 
 /**

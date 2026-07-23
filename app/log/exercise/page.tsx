@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import * as local from '@/lib/local-db'
 import { fromDatetimeLocal, parseDuration, toDatetimeLocal } from '@/lib/format'
-import { useExerciseTypes } from '@/lib/use-store'
+import { useActiveSession, useExerciseTypes } from '@/lib/use-store'
 import type { ExerciseEntry } from '@/lib/types'
 import { SyncBadge } from '../../components/sync-badge'
 
@@ -20,6 +20,7 @@ function readRememberedType(): string | null {
 export default function LogExercisePage() {
   const router = useRouter()
   const types = useExerciseTypes()
+  const activeSession = useActiveSession()
 
   /* This page is prerendered at build time, so a default timestamp computed
    * anywhere but the browser would be the *build* date — months stale by the
@@ -104,7 +105,7 @@ export default function LogExercisePage() {
       weight: weightValue,
       notes: notes.trim() || null,
       performed_at: performedAt ? fromDatetimeLocal(performedAt) : now,
-      session_id: null,
+      session_id: activeSession?.id ?? null,
       created_at: now,
       updated_at: now,
       deleted_at: null,

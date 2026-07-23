@@ -15,7 +15,7 @@ import {
 } from './types'
 
 const DB_NAME = 'healthtracker'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 /** Local-only bookkeeping added to each stored row. */
 export interface LocalMeta {
@@ -31,6 +31,11 @@ export type Local<T> = T & LocalMeta
 const META_STORE = 'meta'
 const SONGS_STORE = 'ddr_songs'
 const PHOTOS_STORE = 'pending_photos'
+
+/** Tables whose rows carry a `performed_at` field worth indexing. Everything
+ *  else (exercise_types, workout_templates, workout_sessions) doesn't have
+ *  one -- workout_sessions has started_at instead. */
+const PERFORMED_AT_TABLES = new Set<SyncTable>(['exercise_entries', 'ddr_entries'])
 
 /** A compressed photo waiting to reach the server, keyed by the entry it
  *  belongs to — one photo per DDR entry, so a retried upload replaces rather
@@ -53,7 +58,7 @@ function open(): Promise<IDBDatabase> {
         if (db.objectStoreNames.contains(table)) continue
         const store = db.createObjectStore(table, { keyPath: 'id' })
         store.createIndex('pending', 'pending')
-        if (table !== 'exercise_types') {
+        if (PERFORMED_AT_TABLES.has(table)) {
           store.createIndex('performed_at', 'performed_at')
         }
       }
