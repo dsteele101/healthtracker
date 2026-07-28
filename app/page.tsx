@@ -89,6 +89,7 @@ function DdrEntryRow({
 }) {
   const entry = item.raw as local.Local<DdrEntry>
   const [editing, setEditing] = useState(false)
+  const [headingExpanded, setHeadingExpanded] = useState(false)
   const [title, setTitle] = useState(entry.song_title)
   const [artist, setArtist] = useState(entry.artist ?? '')
   const [scale, setScale] = useState<DifficultyScale>(entry.difficulty_scale)
@@ -320,7 +321,14 @@ function DdrEntryRow({
         </span>
       )}
       <div className="grow">
-        <div className="subtitle">{item.heading}</div>
+        <button
+          type="button"
+          className={`subtitle heading-toggle${headingExpanded ? ' is-expanded' : ''}`}
+          aria-expanded={headingExpanded}
+          onClick={() => setHeadingExpanded((v) => !v)}
+        >
+          {item.heading}
+        </button>
         {item.detail && <div className="muted mono">{item.detail}</div>}
         <div className="muted mono">{formatWhen(item.performedAt)}</div>
         {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
@@ -374,6 +382,7 @@ function ExerciseEntryRow({
 }) {
   const entry = item.raw as local.Local<ExerciseEntry>
   const [editing, setEditing] = useState(false)
+  const [headingExpanded, setHeadingExpanded] = useState(false)
   const [sets, setSets] = useState(String(entry.sets))
   const [reps, setReps] = useState(entry.reps !== null ? String(entry.reps) : '')
   const [duration, setDuration] = useState(lengthToInput(entry.duration_seconds))
@@ -569,25 +578,33 @@ function ExerciseEntryRow({
       <span className="type-icon" aria-hidden="true">
         {item.icon ?? DEFAULT_EXERCISE_ICON}
       </span>
-      {item.exerciseTypeId ? (
-        <Link href={`/exercise/${item.exerciseTypeId}`} className="grow">
-          <div className="subtitle">{item.heading}</div>
-          {/* Metrics and timestamp on separate lines: joined into one they
-              wrap mid-date on a narrow phone, which reads as a mistake. */}
-          {item.detail && <div className="muted mono">{item.detail}</div>}
-          <div className="muted mono">{formatWhen(item.performedAt)}</div>
-          {item.note && <div className="muted">{item.note}</div>}
-          {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
-        </Link>
-      ) : (
-        <div className="grow">
-          <div className="subtitle">{item.heading}</div>
-          {item.detail && <div className="muted mono">{item.detail}</div>}
-          <div className="muted mono">{formatWhen(item.performedAt)}</div>
-          {item.note && <div className="muted">{item.note}</div>}
-          {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
-        </div>
-      )}
+      <div className="grow">
+        <button
+          type="button"
+          className={`subtitle heading-toggle${headingExpanded ? ' is-expanded' : ''}`}
+          aria-expanded={headingExpanded}
+          onClick={() => setHeadingExpanded((v) => !v)}
+        >
+          {item.heading}
+        </button>
+        {/* Metrics and timestamp on separate lines: joined into one they
+            wrap mid-date on a narrow phone, which reads as a mistake. */}
+        {item.exerciseTypeId ? (
+          <Link href={`/exercise/${item.exerciseTypeId}`}>
+            {item.detail && <div className="muted mono">{item.detail}</div>}
+            <div className="muted mono">{formatWhen(item.performedAt)}</div>
+            {item.note && <div className="muted">{item.note}</div>}
+            {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
+          </Link>
+        ) : (
+          <>
+            {item.detail && <div className="muted mono">{item.detail}</div>}
+            <div className="muted mono">{formatWhen(item.performedAt)}</div>
+            {item.note && <div className="muted">{item.note}</div>}
+            {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
+          </>
+        )}
+      </div>
 
       <div className="row">
         {selectMode ? (
