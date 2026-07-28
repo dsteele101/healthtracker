@@ -212,45 +212,13 @@ textarea:focus-visible {
 }
 
 /* Entry rows (timeline, exercise history, session members) pair a thumbnail,
-   freeform heading text (DDR song titles can run long), and a cluster of
-   action buttons on one line. Truncate the heading instead of letting it
-   wrap into the button column, and let the action cluster wrap to its own
-   line as a fallback so it can never push past the card's edge. */
-article.card.spread .subtitle {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The heading is a real <button> (see DdrEntryRow/ExerciseEntryRow in
-   app/page.tsx) so tapping it toggles the truncation off in place — the
-   only way to read a long DDR title or exercise name without leaving the
-   list. Reset it back to looking like the plain text it replaces. */
-article.card.spread .subtitle.heading-toggle {
-  display: block;
-  width: 100%;
-  background: none;
-  border: 0;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-article.card.spread .subtitle.heading-toggle.is-expanded {
-  overflow: visible;
-  text-overflow: unset;
-  white-space: normal;
-}
-
-/* .grow normally shrinks all the way to 0 (see .grow above) so its
-   sibling gets first claim on space; here that sibling is the row of
-   action buttons, so give the heading column a floor it can truncate
-   into instead of disappearing entirely. */
+   freeform heading text (DDR song titles can run long) that's free to wrap
+   onto multiple lines, and a cluster of action buttons. .grow normally
+   shrinks all the way to 0 (see .grow above) so its sibling — here, the
+   button row — gets first claim on space; give the heading column a floor
+   so it wraps at a readable width instead of being squeezed to nothing. */
 article.card.spread > .grow {
-  min-width: 100px;
+  min-width: 140px;
 }
 
 article.card.spread > .row {
