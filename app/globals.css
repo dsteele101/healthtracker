@@ -211,6 +211,31 @@ textarea:focus-visible {
   transition: background-color 120ms ease, border-color 120ms ease;
 }
 
+/* Entry rows (timeline, exercise history, session members) pair a thumbnail,
+   freeform heading text (DDR song titles can run long), and a cluster of
+   action buttons on one line. Truncate the heading instead of letting it
+   wrap into the button column, and let the action cluster wrap to its own
+   line as a fallback so it can never push past the card's edge. */
+article.card.spread .subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* .grow normally shrinks all the way to 0 (see .grow above) so its
+   sibling gets first claim on space; here that sibling is the row of
+   action buttons, so give the heading column a floor it can truncate
+   into instead of disappearing entirely. */
+article.card.spread > .grow {
+  min-width: 100px;
+}
+
+article.card.spread > .row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 8px;
+}
+
 /* Timeline rows on the home page — the only .card that's a list of distinct
    items rather than a single form/section, so it's the one that benefits
    from a per-row highlight as you scan down the list. */
@@ -221,15 +246,92 @@ textarea:focus-visible {
   }
 }
 
-/* A grouped session on the timeline: a <details> wrapping its member cards,
-   so the disclosure triangle doesn't need its own JS state. */
-.session-summary {
+/* A grouped session on the timeline. The header row is a real <button> so
+   it's keyboard- and screen-reader-operable; it carries aria-expanded and
+   the collapse state lives in React (see SessionGroup in app/page.tsx). */
+.session-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
-  list-style: none;
 }
 
-.session-summary::-webkit-details-marker {
-  display: none;
+.session-toggle .subtitle,
+.session-toggle .muted {
+  display: block;
+}
+
+.disclosure-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1;
+  transition: transform 240ms ease;
+}
+
+.disclosure-chevron.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+/* The collapse itself. Animating to a fixed pixel height would mean
+   measuring the cards in JS; the 0fr→1fr grid-row trick tweens to the
+   content's natural height with no measuring, as long as the child that
+   holds the content clips its own overflow (.session-body-inner). */
+.session-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 240ms ease, opacity 180ms ease;
+}
+
+.session-body.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+/* The gap between the header and the first card. It has to animate along
+   with the row rather than just sit there: padding is not clipped by the
+   row's `min-height: 0`, so a static 12px would leave the drawer stuck at
+   12px tall when closed instead of collapsing flush. */
+.session-body-inner {
+  overflow: hidden;
+  min-height: 0;
+  padding-top: 12px;
+  transition: padding-top 240ms ease;
+}
+
+.session-body:not(.is-open) .session-body-inner {
+  padding-top: 0;
+}
+
+/* A deliberate exemption from the blanket reduced-motion rule at the bottom
+   of this file, which zeroes *every* transition via `* { ... !important }`.
+   That rule exists to suppress large vestibular-triggering motion; applied
+   here it also erases the drawer's only open/close feedback, leaving the
+   group to blink between states with no cue as to what happened. A short
+   height-and-fade tween on one small region isn't the motion that rule is
+   guarding against, so this component opts back in — kept brief so it still
+   reads as restrained. Delete this block to fall back to instant toggling.
+   (Specificity beats `*`, so these win despite appearing earlier.) */
+@media (prefers-reduced-motion: reduce) {
+  .session-body {
+    transition-duration: 240ms, 180ms !important;
+  }
+
+  .session-body-inner {
+    transition-duration: 240ms !important;
+  }
+
+  .disclosure-chevron {
+    transition-duration: 240ms !important;
+  }
 }
 
 .empty {

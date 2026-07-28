@@ -619,6 +619,64 @@ function ExerciseEntryRow({
   )
 }
 
+/** A grouped session's disclosure row.
+ *
+ *  Deliberately *not* a <details>/<summary>. A closed <details> has its
+ *  content hidden by the browser itself — via a `display: none` UA rule on
+ *  older engines, via an anonymous `::details-content` box on newer ones —
+ *  and neither is something a transition on our own markup can ease. These
+ *  are plain elements whose open state lives in React, so the collapse is
+ *  an ordinary CSS transition with nothing browser-controlled in the way.
+ *  Reduced-motion is handled by the global rule in globals.css rather than
+ *  a JS check here, so the animation can never be silently skipped. */
+function SessionGroup({
+  name,
+  earliest,
+  count,
+  sessionId,
+  children,
+}: {
+  name: string
+  earliest: string
+  count: number
+  sessionId: string
+  children: React.ReactNode
+}) {
+  const [isOpen, setIsOpen] = useState(true)
+
+  return (
+    <div className="card">
+      <div className="spread">
+        <button
+          type="button"
+          className="session-toggle grow"
+          aria-expanded={isOpen}
+          onClick={() => setIsOpen((open) => !open)}
+        >
+          <span className={`disclosure-chevron${isOpen ? '' : ' is-collapsed'}`} aria-hidden="true">
+            ▾
+          </span>
+          <span className="grow">
+            <span className="subtitle">{name}</span>
+            <span className="muted mono">
+              {formatWhen(earliest)} · {count} entries
+            </span>
+          </span>
+        </button>
+        <Link href={`/sessions/${sessionId}`} className="btn">
+          Session
+        </Link>
+      </div>
+      <div className={`session-body${isOpen ? ' is-open' : ''}`}>
+        {/* The inner wrapper is what actually gets clipped: the grid row
+            above animates 0fr→1fr, and this clips its overflow so the
+            cards slide out of view instead of spilling past the card. */}
+        <div className="session-body-inner stack">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const exercises = useExerciseEntries()
   const ddr = useDdrEntries()
@@ -1167,26 +1225,15 @@ export default function Home() {
           const session = sessionById.get(row.sessionId)
 
           return (
-            <details key={`group-${row.sessionId}`} className="card" open>
-              <summary className="spread session-summary">
-                <div className="grow">
-                  <div className="subtitle">{session?.name ?? 'Workout session'}</div>
-                  <div className="muted mono">
-                    {formatWhen(earliest)} · {row.items.length} entries
-                  </div>
-                </div>
-                <Link
-                  href={`/sessions/${row.sessionId}`}
-                  className="btn"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Session
-                </Link>
-              </summary>
-              <div className="stack" style={{ marginTop: 12 }}>
-                {row.items.map((item) => renderEntry(item))}
-              </div>
-            </details>
+            <SessionGroup
+              key={`group-${row.sessionId}`}
+              name={session?.name ?? 'Workout session'}
+              earliest={earliest}
+              count={row.items.length}
+              sessionId={row.sessionId}
+            >
+              {row.items.map((item) => renderEntry(item))}
+            </SessionGroup>
           )
         })}
 
