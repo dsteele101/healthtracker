@@ -1,4 +1,5 @@
 import type { SetDetail } from '@/lib/types'
+import { NumberField } from './number-field'
 
 /** One editable row per set, for exercises whose reps/weight vary set to
  *  set instead of being uniform. Shared by the log form, the entry editor,
@@ -36,14 +37,10 @@ export function SetDetailRows({
           {showWeight && (
             <div className="field grow">
               <label className="label">{`Set ${index + 1} weight`}</label>
-              <input
-                inputMode="decimal"
-                value={set.weight ?? ''}
+              <NumberField
+                value={set.weight}
                 placeholder="Optional"
-                onChange={(e) => {
-                  const value = e.target.value.trim()
-                  onChange(sets.map((s, i) => (i === index ? { ...s, weight: value ? Number(value) : null } : s)))
-                }}
+                onChange={(weight) => onChange(sets.map((s, i) => (i === index ? { ...s, weight } : s)))}
               />
             </div>
           )}

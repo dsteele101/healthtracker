@@ -7,6 +7,7 @@ import { formatDuration, parseDuration } from '@/lib/format'
 import { useExerciseTypes, useWorkoutTemplates } from '@/lib/use-store'
 import type { ExerciseType, WorkoutTemplate, WorkoutTemplateItem } from '@/lib/types'
 import { HeaderActions } from '../components/header-actions'
+import { NumberField } from '../components/number-field'
 import { SetDetailRows } from '../components/set-detail-rows'
 
 function emptyItem(exerciseTypeId: string): WorkoutTemplateItem {
@@ -104,14 +105,10 @@ function ItemFields({
         {!varyBySet && (
           <div className="field grow">
             <label className="label">Weight</label>
-            <input
-              inputMode="decimal"
-              value={item.target_weight ?? ''}
+            <NumberField
+              value={item.target_weight}
               placeholder="Optional"
-              onChange={(e) => {
-                const value = e.target.value.trim()
-                onChange({ ...item, target_weight: value ? Number(value) : null })
-              }}
+              onChange={(target_weight) => onChange({ ...item, target_weight })}
             />
           </div>
         )}
