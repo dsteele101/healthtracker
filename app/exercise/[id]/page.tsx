@@ -113,7 +113,7 @@ export default function ExerciseDetailPage() {
       <div className="card stack">
         <div className="row">
           <span className="type-icon" aria-hidden="true">
-            <ExerciseIcon icon={type.icon ?? DEFAULT_EXERCISE_ICON} />
+            <ExerciseIcon icon={type.icon ?? DEFAULT_EXERCISE_ICON} iconSvg={type.icon_svg} />
           </span>
           <div className="grow">
             <div className="subtitle">{type.name}</div>

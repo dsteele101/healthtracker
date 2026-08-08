@@ -603,6 +603,16 @@ a:has(> .thumb):active .thumb {
   background: color-mix(in srgb, var(--accent) 16%, var(--background));
 }
 
+/* "Generate icon", with the drawing it produced next to it. Wraps rather than
+   shrinks: on a narrow phone the hint takes its own line instead of squeezing
+   the button below a comfortable tap target. */
+.icon-generate {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .type-icon-btn {
   padding: 0;
   width: 48px;

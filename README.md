@@ -19,6 +19,9 @@ self-hosted, that keeps working with no signal.
 - **Photo import.** Snap a DDR results screen and the entry form pre-fills.
   Four interchangeable OCR providers behind one interface; nothing saves without
   confirmation.
+- **Generated icons.** Adding an exercise can ask Claude to draw a pictogram of
+  the movement from its name, for the many exercises no emoji covers. The
+  drawing syncs with the row, so it costs nothing to render offline.
 
 ## Setup and operations
 

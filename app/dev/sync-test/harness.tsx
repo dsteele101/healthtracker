@@ -28,6 +28,7 @@ function makeType(overrides: Partial<ExerciseType> = {}): ExerciseType {
     tracks_duration: false,
     tracks_weight: false,
     icon: null,
+    icon_svg: null,
     info_url: null,
     created_at: iso(),
     updated_at: iso(),

@@ -50,8 +50,10 @@ interface TimelineItem {
   rejected?: string
   photoPath: string | null
   /** Exercise types carry their own icon; DDR falls back to a fixed arrow
-   *  glyph, so this is only ever set for the exercise_entries branch. */
+   *  glyph, so these are only ever set for the exercise_entries branch. */
   icon: string | null
+  /** A generated drawing, when the type has one instead of a preset. */
+  iconSvg: string | null
   /** The underlying record, for editing — the fields above are a read-only
    *  projection and don't carry enough to repopulate an edit form. */
   raw: local.Local<DdrEntry> | local.Local<ExerciseEntry>
@@ -568,7 +570,7 @@ function ExerciseEntryRow({
   return (
     <article className="card spread">
       <span className="type-icon" aria-hidden="true">
-        <ExerciseIcon icon={item.icon ?? DEFAULT_EXERCISE_ICON} />
+        <ExerciseIcon icon={item.icon ?? DEFAULT_EXERCISE_ICON} iconSvg={item.iconSvg} />
       </span>
       {item.exerciseTypeId ? (
         <Link href={`/exercise/${item.exerciseTypeId}`} className="grow">
@@ -747,6 +749,7 @@ export default function Home() {
       rejected: entry.rejected_reason,
       photoPath: null,
       icon: typeOf(entry.exercise_type_id)?.icon ?? null,
+      iconSvg: typeOf(entry.exercise_type_id)?.icon_svg ?? null,
       raw: entry,
     }))
 
@@ -771,6 +774,7 @@ export default function Home() {
       rejected: entry.rejected_reason,
       photoPath: entry.photo_path,
       icon: null,
+      iconSvg: null,
       raw: entry,
     }))
 

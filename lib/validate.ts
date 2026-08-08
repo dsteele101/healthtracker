@@ -4,6 +4,7 @@
  * changes and partial writes. A malformed row should be reported back and
  * quarantined, not written or silently dropped. */
 
+import { sanitizeIconSvg } from './icon-svg'
 import type {
   DdrEntry,
   ExerciseEntry,
@@ -114,20 +115,39 @@ function wrap<T>(fn: () => T): Validated<T> {
 }
 
 function validateExerciseType(row: Row): Validated<ExerciseType> {
-  return wrap(() => ({
-    id: uuid(row, 'id'),
-    name: text(row, 'name', 120),
-    tracks_reps: bool(row, 'tracks_reps'),
-    tracks_duration: bool(row, 'tracks_duration'),
-    tracks_weight: bool(row, 'tracks_weight'),
+  return wrap(() => {
     // Generous for multi-codepoint emoji (skin tone modifiers, ZWJ sequences)
     // without allowing an actual icon-length string in.
-    icon: textOrNull(row, 'icon', 16),
-    info_url: urlOrNull(row, 'info_url', 2000),
-    created_at: iso(row, 'created_at'),
-    updated_at: iso(row, 'updated_at'),
-    deleted_at: isoOrNull(row, 'deleted_at'),
-  }))
+    const icon = textOrNull(row, 'icon', 16)
+
+    /* Untrusted markup on its way to a column that gets rendered into the page,
+     * on this device and every other one. The sanitizer is the boundary — see
+     * the header of lib/icon-svg.ts. */
+    const iconSvg = row.icon_svg == null || row.icon_svg === ''
+      ? null
+      : sanitizeIconSvg(String(row.icon_svg))
+
+    // Mirrors the check constraint the column carries (013). Rejecting here
+    // means the row comes back with a reason attached rather than as a raw
+    // constraint violation from the upsert.
+    if (icon !== null && iconSvg !== null) {
+      throw new Error('a type has either a preset icon or a generated one, not both')
+    }
+
+    return {
+      id: uuid(row, 'id'),
+      name: text(row, 'name', 120),
+      tracks_reps: bool(row, 'tracks_reps'),
+      tracks_duration: bool(row, 'tracks_duration'),
+      tracks_weight: bool(row, 'tracks_weight'),
+      icon,
+      icon_svg: iconSvg,
+      info_url: urlOrNull(row, 'info_url', 2000),
+      created_at: iso(row, 'created_at'),
+      updated_at: iso(row, 'updated_at'),
+      deleted_at: isoOrNull(row, 'deleted_at'),
+    }
+  })
 }
 
 function validateExerciseEntry(row: Row): Validated<ExerciseEntry> {

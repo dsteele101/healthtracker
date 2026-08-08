@@ -13,7 +13,7 @@ const SHARED_TABLES = new Set<SyncTable>(['exercise_types'])
 
 const COLUMNS: Record<SyncTable, string> = {
   exercise_types: `
-    id, name, tracks_reps, tracks_duration, tracks_weight, icon, info_url,
+    id, name, tracks_reps, tracks_duration, tracks_weight, icon, icon_svg, info_url,
     created_at, updated_at, deleted_at, server_seq
   `,
   exercise_entries: `

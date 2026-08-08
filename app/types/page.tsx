@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import * as local from '@/lib/local-db'
 import { useExerciseTypes } from '@/lib/use-store'
 import type { ExerciseType } from '@/lib/types'
@@ -12,23 +12,143 @@ import { HeaderActions } from '../components/header-actions'
 import { IconPicker as SharedIconPicker } from '../components/icon-picker'
 import { InfoUrlField } from '../components/info-url-field'
 
-/** Preset grid plus a "no icon" option that clears back to the generic
- *  fallback. Shared between the create form and the per-row editor below. */
-function IconPicker({
+/** The two ways a type can carry an icon, as the forms below hold them. At most
+ *  one is ever set — see 013_exercise_type_icon_svg.sql. */
+interface IconChoice {
+  icon: string | null
+  icon_svg: string | null
+}
+
+/* Selects nothing in the preset grid, which is how the picker is told that
+ * what's in use didn't come from the grid at all. Any string that isn't a
+ * preset would do; this one says why in a stack trace. */
+const NOT_A_PRESET = 'generated'
+
+/** Preset grid, a "no icon" option that clears back to the generic fallback,
+ *  and a button that draws one from the exercise's name instead. Shared between
+ *  the create form and the per-row editor below.
+ *
+ *  The two kinds are mutually exclusive, and this is where that is enforced:
+ *  picking from the grid drops a drawing, drawing one clears the pick. */
+function IconField({
+  id,
+  name,
   value,
   onChange,
 }: {
-  value: string | null
-  onChange: (icon: string | null) => void
+  id: string
+  /** What to draw. Empty until the exercise has been named, which is why the
+   *  button explains itself rather than just sitting there disabled. */
+  name: string
+  value: IconChoice
+  onChange: (choice: IconChoice) => void
 }) {
+  const [available, setAvailable] = useState(false)
+  const [drawing, setDrawing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  /* Ask up front whether generation is usable. With no API key configured the
+   * button never appears, and the grid is the whole feature — the same way a
+   * missing OCR credential degrades photo import to manual entry. */
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/exercise-icon')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!cancelled) setAvailable(Boolean(data?.available))
+      })
+      .catch(() => {
+        if (!cancelled) setAvailable(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const trimmedName = name.trim()
+
+  async function generate() {
+    setDrawing(true)
+    setError(null)
+    try {
+      onChange({ icon: null, icon_svg: await requestIcon(trimmedName) })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not draw an icon.')
+    } finally {
+      setDrawing(false)
+    }
+  }
+
   return (
-    <SharedIconPicker
-      presets={EXERCISE_ICON_PRESETS}
-      value={value}
-      onChange={onChange}
-      renderIcon={(icon) => <ExerciseIcon icon={icon} />}
-    />
+    <div className="field">
+      <span className="label" id={`${id}-label`}>
+        Icon
+      </span>
+
+      <SharedIconPicker
+        presets={EXERCISE_ICON_PRESETS}
+        value={value.icon_svg ? NOT_A_PRESET : value.icon}
+        onChange={(icon) => {
+          setError(null)
+          onChange({ icon, icon_svg: null })
+        }}
+        renderIcon={(icon) => <ExerciseIcon icon={icon} />}
+      />
+
+      {available && (
+        <div className="icon-generate">
+          {value.icon_svg && (
+            <span className="type-icon" aria-label="Generated icon">
+              <ExerciseIcon icon={DEFAULT_EXERCISE_ICON} iconSvg={value.icon_svg} />
+            </span>
+          )}
+          <button
+            type="button"
+            className="btn"
+            disabled={drawing || trimmedName === ''}
+            onClick={generate}
+          >
+            {drawing ? 'Drawing…' : value.icon_svg ? 'Draw another' : 'Generate icon'}
+          </button>
+          <span className="hint grow">
+            {trimmedName === ''
+              ? 'Name the exercise to draw one.'
+              : `Draws an icon for "${trimmedName}".`}
+          </span>
+        </div>
+      )}
+
+      {error && <p className="error">{error}</p>}
+    </div>
   )
+}
+
+/** Asks the server to draw one. What comes back has already been through the
+ *  sanitizer (see lib/icon-svg.ts), so it goes straight into the row. */
+async function requestIcon(name: string): Promise<string> {
+  const response = await fetch('/api/exercise-icon', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name }),
+    redirect: 'manual',
+  })
+
+  /* An expired Cloudflare Access session answers with a redirect to its login
+   * origin, which arrives here as an opaqueredirect (status 0). The useful
+   * message is "sign in again", not "could not draw an icon". */
+  if (
+    response.type === 'opaqueredirect' ||
+    response.redirected ||
+    (response.status >= 300 && response.status < 400)
+  ) {
+    throw new Error('Session expired. Reload the page and sign in again.')
+  }
+
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(payload.error ?? `Could not draw an icon (${response.status}).`)
+  }
+  return payload.svg as string
 }
 
 /** Edits everything about an existing type in place: name, which fields the
@@ -41,7 +161,10 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
   const [tracksReps, setTracksReps] = useState(type.tracks_reps)
   const [tracksDuration, setTracksDuration] = useState(type.tracks_duration)
   const [tracksWeight, setTracksWeight] = useState(type.tracks_weight)
-  const [icon, setIcon] = useState(type.icon)
+  const [icon, setIcon] = useState<IconChoice>({
+    icon: type.icon,
+    icon_svg: type.icon_svg,
+  })
   const [infoUrl, setInfoUrl] = useState(type.info_url ?? '')
   const [error, setError] = useState<string | null>(null)
 
@@ -50,7 +173,7 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
     setTracksReps(type.tracks_reps)
     setTracksDuration(type.tracks_duration)
     setTracksWeight(type.tracks_weight)
-    setIcon(type.icon)
+    setIcon({ icon: type.icon, icon_svg: type.icon_svg })
     setInfoUrl(type.info_url ?? '')
     setError(null)
     setEditing(true)
@@ -72,7 +195,8 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
       tracks_reps: tracksReps,
       tracks_duration: tracksDuration,
       tracks_weight: tracksWeight,
-      icon,
+      icon: icon.icon,
+      icon_svg: icon.icon_svg,
       info_url: parsedInfoUrl.value,
       updated_at: new Date().toISOString(),
     })
@@ -109,10 +233,7 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
           }}
         />
 
-        <div className="field">
-          <span className="label">Icon</span>
-          <IconPicker value={icon} onChange={setIcon} />
-        </div>
+        <IconField id={`icon-${type.id}`} name={name} value={icon} onChange={setIcon} />
 
         <InfoUrlField id={`info-url-${type.id}`} value={infoUrl} onChange={setInfoUrl} />
 
@@ -140,7 +261,7 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
           onClick={startEditing}
         >
           <span className="type-icon" aria-hidden="true">
-            <ExerciseIcon icon={type.icon ?? DEFAULT_EXERCISE_ICON} />
+            <ExerciseIcon icon={type.icon ?? DEFAULT_EXERCISE_ICON} iconSvg={type.icon_svg} />
           </span>
         </button>
         <div className="grow">
@@ -231,7 +352,7 @@ export default function ExerciseTypesPage() {
   const [tracksReps, setTracksReps] = useState(true)
   const [tracksDuration, setTracksDuration] = useState(false)
   const [tracksWeight, setTracksWeight] = useState(false)
-  const [icon, setIcon] = useState<string | null>(null)
+  const [icon, setIcon] = useState<IconChoice>({ icon: null, icon_svg: null })
   const [infoUrl, setInfoUrl] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -259,7 +380,8 @@ export default function ExerciseTypesPage() {
       tracks_reps: tracksReps,
       tracks_duration: tracksDuration,
       tracks_weight: tracksWeight,
-      icon,
+      icon: icon.icon,
+      icon_svg: icon.icon_svg,
       info_url: parsedInfoUrl.value,
       created_at: now,
       updated_at: now,
@@ -271,7 +393,7 @@ export default function ExerciseTypesPage() {
     setTracksReps(true)
     setTracksDuration(false)
     setTracksWeight(false)
-    setIcon(null)
+    setIcon({ icon: null, icon_svg: null })
     setInfoUrl('')
     setError(null)
   }
@@ -312,10 +434,7 @@ export default function ExerciseTypesPage() {
           }}
         />
 
-        <div className="field">
-          <span className="label">Icon</span>
-          <IconPicker value={icon} onChange={setIcon} />
-        </div>
+        <IconField id="icon-new" name={name} value={icon} onChange={setIcon} />
 
         <InfoUrlField id="info-url-new" value={infoUrl} onChange={setInfoUrl} />
 

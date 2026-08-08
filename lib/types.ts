@@ -42,6 +42,10 @@ export interface ExerciseType extends Syncable {
   tracks_weight: boolean
   /** Single emoji shown on the type's entries. Null falls back to a generic icon. */
   icon: string | null
+  /** A drawing generated from the name instead of a picked emoji — the inner
+   *  markup of a `<svg viewBox="0 0 100 100">`, see lib/icon-svg.ts. Never set
+   *  at the same time as `icon`; both null means no icon. */
+  icon_svg: string | null
   /** Optional link to a video or article explaining the exercise, shown on its detail page. */
   info_url: string | null
 }

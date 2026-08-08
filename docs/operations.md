@@ -344,7 +344,41 @@ without an image.
 
 ---
 
-## 5. Health checks
+## 5. Generated exercise icons
+
+Adding or editing an exercise offers a **Generate icon** button, which asks
+Claude to draw a small pictogram of the movement from its name. Needs
+`ANTHROPIC_API_KEY` — the same key the `claude` OCR provider uses, and the only
+thing it's gated on. Without it the button doesn't appear and the preset emoji
+grid is the whole feature.
+
+`claude-opus-5` by default; override with `CLAUDE_ICON_MODEL`. A deliberately
+more expensive model than photo import's Haiku (a fraction of a cent per icon):
+drawing something recognisable is where model quality shows, and an icon is
+generated once per exercise rather than once per log.
+
+What comes back isn't an image file. It's the *contents* of an
+`<svg viewBox="0 0 100 100">` — shape elements only — stored in
+`exercise_types.icon_svg` and synced with the row, so the icon reaches every
+device the same way the name does and costs nothing to render offline. The
+wrapper, the size and the color come from the app, which is why a generated icon
+matches the hand-drawn presets instead of looking pasted in.
+
+A type has either a preset icon or a generated one, never both: picking from the
+grid drops the drawing, generating one clears the pick. The column has a check
+constraint saying so.
+
+**On trusting the output.** Model output is untrusted markup heading for a
+column that gets rendered into the page on everyone's device, so it goes through
+the whitelist in `lib/icon-svg.ts` — a fixed set of shape elements, a fixed set
+of geometry and color attributes, and a value charset with no `:` in it. Both
+writers use it: the generation route, and the sync endpoint, which has to assume
+a pushed row was hand-crafted. Anything not positively recognised is refused
+rather than cleaned up.
+
+---
+
+## 6. Health checks
 
 ```bash
 docker compose ps                       # both services up, postgres healthy

@@ -25,15 +25,16 @@ const SHARED_TABLES = new Set<SyncTable>(['exercise_types'])
 const UPSERTS: Record<SyncTable, string> = {
   exercise_types: `
     INSERT INTO exercise_types
-      (id, created_by, name, tracks_reps, tracks_duration, tracks_weight, icon, info_url,
-       created_at, updated_at, deleted_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      (id, created_by, name, tracks_reps, tracks_duration, tracks_weight, icon, icon_svg,
+       info_url, created_at, updated_at, deleted_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     ON CONFLICT (id) DO UPDATE SET
       name            = EXCLUDED.name,
       tracks_reps     = EXCLUDED.tracks_reps,
       tracks_duration = EXCLUDED.tracks_duration,
       tracks_weight   = EXCLUDED.tracks_weight,
       icon            = EXCLUDED.icon,
+      icon_svg        = EXCLUDED.icon_svg,
       info_url        = EXCLUDED.info_url,
       updated_at      = EXCLUDED.updated_at,
       deleted_at      = EXCLUDED.deleted_at,
@@ -139,7 +140,7 @@ function params(table: SyncTable, row: Record<string, unknown>, userId: string):
     case 'exercise_types':
       return [
         row.id, userId, row.name, row.tracks_reps, row.tracks_duration, row.tracks_weight,
-        row.icon, row.info_url, row.created_at, row.updated_at, row.deleted_at,
+        row.icon, row.icon_svg, row.info_url, row.created_at, row.updated_at, row.deleted_at,
       ]
     case 'exercise_entries':
       return [
