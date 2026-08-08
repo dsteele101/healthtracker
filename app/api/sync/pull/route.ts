@@ -17,8 +17,8 @@ const COLUMNS: Record<SyncTable, string> = {
     created_at, updated_at, deleted_at, server_seq
   `,
   exercise_entries: `
-    id, exercise_type_id, sets, reps, duration_seconds, weight::float8 AS weight, notes,
-    performed_at, session_id, created_at, updated_at, deleted_at, server_seq
+    id, exercise_type_id, sets, reps, duration_seconds, weight::float8 AS weight, set_details,
+    notes, performed_at, session_id, created_at, updated_at, deleted_at, server_seq
   `,
   ddr_entries: `
     id, song_title, artist, difficulty, difficulty_scale, difficulty_type,

@@ -9,6 +9,7 @@ import type {
   DdrEntry,
   ExerciseEntry,
   ExerciseType,
+  SetDetail,
   SyncTable,
   WorkoutSession,
   WorkoutTemplate,
@@ -92,6 +93,33 @@ function uuidOrNull(row: Row, field: string): string | null {
   return uuid(row, field)
 }
 
+// An empty array is normalized to null: both would otherwise mean "no
+// variance," and the app avoids two representations of the same state (see
+// icon/icon_svg both-null above).
+function setDetailsOrNull(row: Row, field: string, max: number): SetDetail[] | null {
+  const value = row[field]
+  if (value == null) return null
+  if (!Array.isArray(value)) throw new Error(`${field} must be an array`)
+  if (value.length > max) throw new Error(`${field} exceeds ${max} entries`)
+  if (value.length === 0) return null
+
+  return value.map((raw, index) => {
+    if (typeof raw !== 'object' || raw === null) {
+      throw new Error(`${field}[${index}] must be an object`)
+    }
+    const set = raw as Row
+    try {
+      return {
+        reps: intOrNull(set, 'reps', 0, 100_000),
+        weight: numberOrNull(set, 'weight', 0, 10_000),
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'invalid set'
+      throw new Error(`${field}[${index}]: ${message}`)
+    }
+  })
+}
+
 function urlOrNull(row: Row, field: string, max: number): string | null {
   const value = textOrNull(row, field, max)
   if (value === null) return value
@@ -152,20 +180,31 @@ function validateExerciseType(row: Row): Validated<ExerciseType> {
 
 function validateExerciseEntry(row: Row): Validated<ExerciseEntry> {
   return wrap(() => {
+    const details = setDetailsOrNull(row, 'set_details', 50)
     const reps = intOrNull(row, 'reps', 0, 100_000)
+    const weight = numberOrNull(row, 'weight', 0, 10_000)
+    // set_details replaces reps/weight rather than supplementing them -- two
+    // representations of the same numbers would only ever drift apart.
+    if (details !== null && (reps !== null || weight !== null)) {
+      throw new Error('set_details replaces reps and weight, they cannot both be set')
+    }
     const duration = intOrNull(row, 'duration_seconds', 0, 86_400)
+    const hasReps = reps !== null || (details?.some((set) => set.reps !== null) ?? false)
     // A log line recording neither a count nor a time isn't a workout, it's an
     // empty row — reject rather than store something meaningless.
-    if (reps === null && duration === null && !row.notes) {
+    if (!hasReps && duration === null && !row.notes) {
       throw new Error('entry needs reps, a duration, or a note')
     }
     return {
       id: uuid(row, 'id'),
       exercise_type_id: uuid(row, 'exercise_type_id'),
-      sets: int(row, 'sets', 1, 1000),
+      // Trusting the array's length rather than the client's `sets` keeps
+      // one source of truth -- there is no way for the two to disagree.
+      sets: details !== null ? details.length : int(row, 'sets', 1, 1000),
       reps,
       duration_seconds: duration,
-      weight: numberOrNull(row, 'weight', 0, 10_000),
+      weight,
+      set_details: details,
       notes: textOrNull(row, 'notes', 2000),
       performed_at: iso(row, 'performed_at'),
       session_id: uuidOrNull(row, 'session_id'),
@@ -225,11 +264,19 @@ function workoutTemplateItems(row: Row): WorkoutTemplateItem[] {
     }
     const item = raw as Row
     try {
+      const targetDetails = setDetailsOrNull(item, 'target_set_details', 50)
+      const targetReps = intOrNull(item, 'target_reps', 0, 100_000)
+      const targetWeight = numberOrNull(item, 'target_weight', 0, 10_000)
+      if (targetDetails !== null && (targetReps !== null || targetWeight !== null)) {
+        throw new Error('target_set_details replaces target_reps and target_weight, they cannot both be set')
+      }
       return {
         exercise_type_id: uuid(item, 'exercise_type_id'),
-        target_sets: intOrNull(item, 'target_sets', 1, 1000),
-        target_reps: intOrNull(item, 'target_reps', 0, 100_000),
+        target_sets: targetDetails !== null ? targetDetails.length : intOrNull(item, 'target_sets', 1, 1000),
+        target_reps: targetReps,
         target_duration_seconds: intOrNull(item, 'target_duration_seconds', 0, 86_400),
+        target_weight: targetWeight,
+        target_set_details: targetDetails,
         notes: textOrNull(item, 'notes', 2000),
       }
     } catch (error) {

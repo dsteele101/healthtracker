@@ -3,7 +3,7 @@
 -- Items have no identity outside their template and always change together
 -- with it, so they're a jsonb column rather than a join table — same call as
 -- ddr_songs being a flat table instead of normalized history.
--- Shape: [{ exercise_type_id, target_sets, target_reps, target_duration_seconds, notes }]
+-- Shape: [{ exercise_type_id, target_sets, target_reps, target_duration_seconds, target_weight, target_set_details, notes }]
 
 CREATE TABLE workout_templates (
     id         uuid PRIMARY KEY,

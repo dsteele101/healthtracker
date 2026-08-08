@@ -43,15 +43,16 @@ const UPSERTS: Record<SyncTable, string> = {
   `,
   exercise_entries: `
     INSERT INTO exercise_entries
-      (id, user_id, exercise_type_id, sets, reps, duration_seconds, weight, notes, performed_at,
-       session_id, created_at, updated_at, deleted_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      (id, user_id, exercise_type_id, sets, reps, duration_seconds, weight, set_details, notes,
+       performed_at, session_id, created_at, updated_at, deleted_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14)
     ON CONFLICT (id) DO UPDATE SET
       exercise_type_id = EXCLUDED.exercise_type_id,
       sets             = EXCLUDED.sets,
       reps             = EXCLUDED.reps,
       duration_seconds = EXCLUDED.duration_seconds,
       weight           = EXCLUDED.weight,
+      set_details      = EXCLUDED.set_details,
       notes            = EXCLUDED.notes,
       performed_at     = EXCLUDED.performed_at,
       session_id       = EXCLUDED.session_id,
@@ -143,9 +144,13 @@ function params(table: SyncTable, row: Record<string, unknown>, userId: string):
         row.icon, row.icon_svg, row.info_url, row.created_at, row.updated_at, row.deleted_at,
       ]
     case 'exercise_entries':
+      // JSON.stringify(null) is the string "null", which through ::jsonb
+      // becomes a JSON null rather than SQL NULL -- guard it explicitly so
+      // the exclusivity CHECK and every `IS NULL` reader stay correct.
       return [
         row.id, userId, row.exercise_type_id, row.sets, row.reps, row.duration_seconds,
-        row.weight, row.notes, row.performed_at, row.session_id, row.created_at,
+        row.weight, row.set_details === null ? null : JSON.stringify(row.set_details),
+        row.notes, row.performed_at, row.session_id, row.created_at,
         row.updated_at, row.deleted_at,
       ]
     case 'ddr_entries':

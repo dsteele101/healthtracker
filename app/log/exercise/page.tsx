@@ -6,8 +6,9 @@ import { useState } from 'react'
 import * as local from '@/lib/local-db'
 import { fromDatetimeLocal, parseDuration, toDatetimeLocal } from '@/lib/format'
 import { useActiveSession, useExerciseTypes } from '@/lib/use-store'
-import type { ExerciseEntry } from '@/lib/types'
+import type { ExerciseEntry, SetDetail } from '@/lib/types'
 import { HeaderActions } from '../../components/header-actions'
+import { SetDetailRows } from '../../components/set-detail-rows'
 
 const LAST_TYPE_KEY = 'tracker:last-exercise-type'
 
@@ -38,6 +39,8 @@ export default function LogExercisePage() {
   const [reps, setReps] = useState('')
   const [duration, setDuration] = useState('')
   const [weight, setWeight] = useState('')
+  const [varyBySet, setVaryBySet] = useState(false)
+  const [setDetails, setSetDetails] = useState<SetDetail[]>([])
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -60,12 +63,14 @@ export default function LogExercisePage() {
     if (!selected) return setError('Pick an exercise.')
 
     const setsValue = Number(sets)
-    if (!Number.isInteger(setsValue) || setsValue < 1) {
+    if (varyBySet) {
+      if (setDetails.length < 1) return setError('Add at least one set.')
+    } else if (!Number.isInteger(setsValue) || setsValue < 1) {
       return setError('Sets must be a whole number, at least 1.')
     }
 
     let repsValue: number | null = null
-    if (selected.tracks_reps && reps.trim()) {
+    if (!varyBySet && selected.tracks_reps && reps.trim()) {
       const parsed = Number(reps)
       if (!Number.isInteger(parsed) || parsed < 0) {
         return setError('Reps must be a whole number.')
@@ -81,12 +86,13 @@ export default function LogExercisePage() {
     }
 
     // Mirrors the server validator, which rejects an entry recording nothing.
-    if (repsValue === null && durationValue === null && !notes.trim()) {
+    const hasReps = varyBySet ? setDetails.some((set) => set.reps !== null) : repsValue !== null
+    if (!hasReps && durationValue === null && !notes.trim()) {
       return setError('Add reps, a time, or a note.')
     }
 
     let weightValue: number | null = null
-    if (selected.tracks_weight && weight.trim()) {
+    if (!varyBySet && selected.tracks_weight && weight.trim()) {
       const parsed = Number(weight)
       if (!Number.isFinite(parsed) || parsed < 0) {
         return setError('Weight must be a positive number.')
@@ -99,10 +105,11 @@ export default function LogExercisePage() {
     const entry: ExerciseEntry = {
       id: crypto.randomUUID(),
       exercise_type_id: selected.id,
-      sets: setsValue,
+      sets: varyBySet ? setDetails.length : setsValue,
       reps: repsValue,
       duration_seconds: durationValue,
       weight: weightValue,
+      set_details: varyBySet ? setDetails : null,
       notes: notes.trim() || null,
       performed_at: performedAt ? fromDatetimeLocal(performedAt) : now,
       session_id: activeSession?.id ?? null,
@@ -197,25 +204,46 @@ export default function LogExercisePage() {
           )}
         </div>
 
-        <div className="field">
-          <label className="label" htmlFor="sets">
-            Sets
+        {!varyBySet && (
+          <div className="field">
+            <label className="label" htmlFor="sets">
+              Sets
+            </label>
+            <input
+              id="sets"
+              inputMode="numeric"
+              value={sets}
+              onChange={(e) => {
+                setSets(e.target.value)
+                setError(null)
+              }}
+              placeholder="1"
+              autoComplete="off"
+            />
+          </div>
+        )}
+
+        {(selected?.tracks_reps || selected?.tracks_weight) && (
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={varyBySet}
+              onChange={(e) => {
+                const checked = e.target.checked
+                setVaryBySet(checked)
+                if (checked && setDetails.length === 0) {
+                  const count = Math.max(1, Number(sets) || 1)
+                  setSetDetails(Array.from({ length: count }, () => ({ reps: null, weight: null })))
+                }
+                setError(null)
+              }}
+            />
+            Vary reps/weight by set
           </label>
-          <input
-            id="sets"
-            inputMode="numeric"
-            value={sets}
-            onChange={(e) => {
-              setSets(e.target.value)
-              setError(null)
-            }}
-            placeholder="1"
-            autoComplete="off"
-          />
-        </div>
+        )}
 
         {/* Only the fields this exercise actually measures. */}
-        {selected?.tracks_reps && (
+        {!varyBySet && selected?.tracks_reps && (
           <div className="field">
             <label className="label" htmlFor="reps">
               Reps
@@ -239,6 +267,18 @@ export default function LogExercisePage() {
           </div>
         )}
 
+        {varyBySet && (
+          <SetDetailRows
+            sets={setDetails}
+            onChange={(next) => {
+              setSetDetails(next)
+              setError(null)
+            }}
+            showReps={selected?.tracks_reps}
+            showWeight={selected?.tracks_weight}
+          />
+        )}
+
         {selected?.tracks_duration && (
           <div className="field">
             <label className="label" htmlFor="duration">
@@ -258,7 +298,7 @@ export default function LogExercisePage() {
           </div>
         )}
 
-        {selected?.tracks_weight && (
+        {!varyBySet && selected?.tracks_weight && (
           <div className="field">
             <label className="label" htmlFor="weight">
               Weight

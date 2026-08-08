@@ -5,7 +5,7 @@
  * recovery path for a self-hosted database. */
 
 import * as local from './local-db'
-import { formatDuration } from './format'
+import { formatDuration, formatSetDetails } from './format'
 import type {
   DdrEntry,
   DdrSong,
@@ -161,7 +161,10 @@ export async function buildExerciseCsv(filter?: ExportFilter): Promise<string> {
   const sorted = filtered.sort((a, b) => a.performed_at.localeCompare(b.performed_at))
 
   return csvRows(
-    ['performed_at', 'exercise', 'sets', 'reps', 'duration_seconds', 'duration', 'weight', 'notes'],
+    [
+      'performed_at', 'exercise', 'sets', 'reps', 'duration_seconds', 'duration', 'weight',
+      'set_details', 'notes',
+    ],
     sorted.map((e) => [
       e.performed_at,
       nameOf(e.exercise_type_id),
@@ -172,6 +175,9 @@ export async function buildExerciseCsv(filter?: ExportFilter): Promise<string> {
       // spreadsheet, the other is legible at a glance.
       e.duration_seconds === null ? '' : formatDuration(e.duration_seconds),
       e.weight,
+      // Blank for a uniform entry, same as reps/weight are blank when it
+      // varies -- there's no single number to put in those columns there.
+      e.set_details ? formatSetDetails(e.set_details) : '',
       e.notes,
     ]),
   )

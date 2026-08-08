@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import * as local from '@/lib/local-db'
-import { formatDuration, formatWhen } from '@/lib/format'
+import { formatSetSummary, formatWhen } from '@/lib/format'
 import {
   useDdrEntries,
   useExerciseEntries,
@@ -221,14 +221,13 @@ export default function SessionDetailPage() {
 
         {memberExercises.map((entry) => {
           const type = types?.find((t) => t.id === entry.exercise_type_id)
-          const detail = [
-            entry.sets != null && `${entry.sets} ${entry.sets === 1 ? 'set' : 'sets'}`,
-            entry.reps !== null && `${entry.reps} reps`,
-            entry.duration_seconds !== null && formatDuration(entry.duration_seconds),
-            entry.weight !== null && `${entry.weight} lb`,
-          ]
-            .filter(Boolean)
-            .join(' · ')
+          const detail = formatSetSummary({
+            sets: entry.sets,
+            reps: entry.reps,
+            durationSeconds: entry.duration_seconds,
+            weight: entry.weight,
+            setDetails: entry.set_details,
+          })
 
           return (
             <article key={entry.id} className="card spread">

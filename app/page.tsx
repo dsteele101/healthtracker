@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import * as local from '@/lib/local-db'
 import {
   formatDuration,
+  formatSetSummary,
   formatWhen,
   fromDatetimeLocal,
   parseDuration,
@@ -23,6 +24,7 @@ import {
   type DifficultyScale,
   type ExerciseEntry,
   type ExerciseType,
+  type SetDetail,
   type SyncTable,
   type WorkoutSession,
 } from '@/lib/types'
@@ -30,6 +32,7 @@ import { DEFAULT_EXERCISE_ICON } from '@/lib/exercise-icons'
 import { DdrArrowIcon } from './components/ddr-arrow-icon'
 import { ExerciseIcon } from './components/exercise-icon'
 import { HeaderActions } from './components/header-actions'
+import { SetDetailRows } from './components/set-detail-rows'
 
 type EntryTable = Extract<SyncTable, 'exercise_entries' | 'ddr_entries'>
 type KindFilter = 'all' | EntryTable
@@ -381,6 +384,8 @@ function ExerciseEntryRow({
   const [reps, setReps] = useState(entry.reps !== null ? String(entry.reps) : '')
   const [duration, setDuration] = useState(lengthToInput(entry.duration_seconds))
   const [weight, setWeight] = useState(entry.weight !== null ? String(entry.weight) : '')
+  const [varyBySet, setVaryBySet] = useState(!!entry.set_details)
+  const [setDetails, setSetDetails] = useState<SetDetail[]>(entry.set_details ?? [])
   const [notes, setNotes] = useState(entry.notes ?? '')
   const [performedAt, setPerformedAt] = useState(toDatetimeLocal(entry.performed_at))
   const [error, setError] = useState<string | null>(null)
@@ -390,6 +395,8 @@ function ExerciseEntryRow({
     setReps(entry.reps !== null ? String(entry.reps) : '')
     setDuration(lengthToInput(entry.duration_seconds))
     setWeight(entry.weight !== null ? String(entry.weight) : '')
+    setVaryBySet(!!entry.set_details)
+    setSetDetails(entry.set_details ?? [])
     setNotes(entry.notes ?? '')
     setPerformedAt(toDatetimeLocal(entry.performed_at))
     setError(null)
@@ -401,12 +408,14 @@ function ExerciseEntryRow({
     if (!type) return setError('This exercise no longer exists.')
 
     const setsValue = Number(sets)
-    if (!Number.isInteger(setsValue) || setsValue < 1) {
+    if (varyBySet) {
+      if (setDetails.length < 1) return setError('Add at least one set.')
+    } else if (!Number.isInteger(setsValue) || setsValue < 1) {
       return setError('Sets must be a whole number, at least 1.')
     }
 
     let repsValue: number | null = null
-    if (type.tracks_reps && reps.trim()) {
+    if (!varyBySet && type.tracks_reps && reps.trim()) {
       const parsed = Number(reps)
       if (!Number.isInteger(parsed) || parsed < 0) {
         return setError('Reps must be a whole number.')
@@ -421,12 +430,13 @@ function ExerciseEntryRow({
       durationValue = parsed
     }
 
-    if (repsValue === null && durationValue === null && !notes.trim()) {
+    const hasReps = varyBySet ? setDetails.some((set) => set.reps !== null) : repsValue !== null
+    if (!hasReps && durationValue === null && !notes.trim()) {
       return setError('Add reps, a time, or a note.')
     }
 
     let weightValue: number | null = null
-    if (type.tracks_weight && weight.trim()) {
+    if (!varyBySet && type.tracks_weight && weight.trim()) {
       const parsed = Number(weight)
       if (!Number.isFinite(parsed) || parsed < 0) {
         return setError('Weight must be a positive number.')
@@ -438,10 +448,11 @@ function ExerciseEntryRow({
 
     await local.put('exercise_entries', {
       ...entry,
-      sets: setsValue,
+      sets: varyBySet ? setDetails.length : setsValue,
       reps: repsValue,
       duration_seconds: durationValue,
       weight: weightValue,
+      set_details: varyBySet ? setDetails : null,
       notes: notes.trim() || null,
       performed_at: fromDatetimeLocal(performedAt),
       updated_at: new Date().toISOString(),
@@ -452,23 +463,44 @@ function ExerciseEntryRow({
   if (editing) {
     return (
       <form onSubmit={save} className="card stack">
-        <div className="field">
-          <label className="label" htmlFor={`sets-${entry.id}`}>
-            Sets
-          </label>
-          <input
-            id={`sets-${entry.id}`}
-            inputMode="numeric"
-            value={sets}
-            onChange={(e) => {
-              setSets(e.target.value)
-              setError(null)
-            }}
-            autoComplete="off"
-          />
-        </div>
+        {!varyBySet && (
+          <div className="field">
+            <label className="label" htmlFor={`sets-${entry.id}`}>
+              Sets
+            </label>
+            <input
+              id={`sets-${entry.id}`}
+              inputMode="numeric"
+              value={sets}
+              onChange={(e) => {
+                setSets(e.target.value)
+                setError(null)
+              }}
+              autoComplete="off"
+            />
+          </div>
+        )}
 
-        {type?.tracks_reps && (
+        {(type?.tracks_reps || type?.tracks_weight) && (
+          <label className="checkbox">
+            <input
+              type="checkbox"
+              checked={varyBySet}
+              onChange={(e) => {
+                const checked = e.target.checked
+                setVaryBySet(checked)
+                if (checked && setDetails.length === 0) {
+                  const count = Math.max(1, Number(sets) || 1)
+                  setSetDetails(Array.from({ length: count }, () => ({ reps: null, weight: null })))
+                }
+                setError(null)
+              }}
+            />
+            Vary reps/weight by set
+          </label>
+        )}
+
+        {!varyBySet && type?.tracks_reps && (
           <div className="field">
             <label className="label" htmlFor={`reps-${entry.id}`}>
               Reps
@@ -484,6 +516,18 @@ function ExerciseEntryRow({
               autoComplete="off"
             />
           </div>
+        )}
+
+        {varyBySet && (
+          <SetDetailRows
+            sets={setDetails}
+            onChange={(next) => {
+              setSetDetails(next)
+              setError(null)
+            }}
+            showReps={type?.tracks_reps}
+            showWeight={type?.tracks_weight}
+          />
         )}
 
         {type?.tracks_duration && (
@@ -505,7 +549,7 @@ function ExerciseEntryRow({
           </div>
         )}
 
-        {type?.tracks_weight && (
+        {!varyBySet && type?.tracks_weight && (
           <div className="field">
             <label className="label" htmlFor={`weight-${entry.id}`}>
               Weight
@@ -734,14 +778,13 @@ export default function Home() {
       table: 'exercise_entries',
       exerciseTypeId: entry.exercise_type_id,
       heading: typeOf(entry.exercise_type_id)?.name ?? 'Unknown exercise',
-      detail: [
-        entry.sets != null && `${entry.sets} ${entry.sets === 1 ? 'set' : 'sets'}`,
-        entry.reps !== null && `${entry.reps} reps`,
-        entry.duration_seconds !== null && formatDuration(entry.duration_seconds),
-        entry.weight !== null && `${entry.weight} lb`,
-      ]
-        .filter(Boolean)
-        .join(' · '),
+      detail: formatSetSummary({
+        sets: entry.sets,
+        reps: entry.reps,
+        durationSeconds: entry.duration_seconds,
+        weight: entry.weight,
+        setDetails: entry.set_details,
+      }),
       note: entry.notes,
       performedAt: entry.performed_at,
       sessionId: entry.session_id,

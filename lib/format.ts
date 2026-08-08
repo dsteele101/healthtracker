@@ -1,5 +1,56 @@
 /** Formatting and parsing shared by the entry forms. */
 
+import type { SetDetail } from './types'
+
+/** "15 reps @ 30 lb · 12 reps @ 25 lb · 10 reps @ 20 lb" — one set per
+ *  segment. Split out from formatSetSummary because the CSV export wants
+ *  just this piece, not the full summary line. */
+export function formatSetDetails(setDetails: SetDetail[]): string {
+  return setDetails
+    .map((set) =>
+      [
+        set.reps !== null && `${set.reps} reps`,
+        set.weight !== null && `${set.weight} lb`,
+      ]
+        .filter(Boolean)
+        .join(' @ ') || '—',
+    )
+    .join(' · ')
+}
+
+/** The one-line summary shown on the timeline, exercise detail, and session
+ *  detail pages. Takes primitive fields rather than an ExerciseEntry or
+ *  WorkoutTemplateItem directly, so the same function serves both despite
+ *  their different field names (reps vs target_reps, etc). */
+export function formatSetSummary(params: {
+  sets: number | null
+  reps: number | null
+  durationSeconds: number | null
+  weight: number | null
+  setDetails: SetDetail[] | null
+}): string {
+  // Falsy check, not just `=== null`: rows written to IndexedDB before this
+  // field existed don't have the key at all, so it reads as undefined there
+  // until the next sync backfills it.
+  if (!params.setDetails || params.setDetails.length === 0) {
+    return [
+      params.sets != null && `${params.sets} ${params.sets === 1 ? 'set' : 'sets'}`,
+      params.reps !== null && `${params.reps} reps`,
+      params.durationSeconds !== null && formatDuration(params.durationSeconds),
+      params.weight !== null && `${params.weight} lb`,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  }
+
+  return [
+    formatSetDetails(params.setDetails),
+    params.durationSeconds !== null && formatDuration(params.durationSeconds),
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
 /** Renders seconds as m:ss, or h:mm:ss past an hour. */
 export function formatDuration(seconds: number): string {
   const h = Math.floor(seconds / 3600)

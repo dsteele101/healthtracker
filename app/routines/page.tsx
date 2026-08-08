@@ -7,6 +7,7 @@ import { formatDuration, parseDuration } from '@/lib/format'
 import { useExerciseTypes, useWorkoutTemplates } from '@/lib/use-store'
 import type { ExerciseType, WorkoutTemplate, WorkoutTemplateItem } from '@/lib/types'
 import { HeaderActions } from '../components/header-actions'
+import { SetDetailRows } from '../components/set-detail-rows'
 
 function emptyItem(exerciseTypeId: string): WorkoutTemplateItem {
   return {
@@ -14,6 +15,8 @@ function emptyItem(exerciseTypeId: string): WorkoutTemplateItem {
     target_sets: null,
     target_reps: null,
     target_duration_seconds: null,
+    target_weight: null,
+    target_set_details: null,
     notes: null,
   }
 }
@@ -34,6 +37,9 @@ function ItemFields({
   const [duration, setDuration] = useState(
     item.target_duration_seconds !== null ? formatDuration(item.target_duration_seconds) : '',
   )
+  // Falsy check, not just `!== null`: routine items saved before this field
+  // existed lack the key entirely, so it's undefined there until re-saved.
+  const varyBySet = !!item.target_set_details
 
   return (
     <div className="card stack">
@@ -55,30 +61,34 @@ function ItemFields({
       </div>
 
       <div className="row">
-        <div className="field grow">
-          <label className="label">Sets</label>
-          <input
-            inputMode="numeric"
-            value={item.target_sets ?? ''}
-            placeholder="Optional"
-            onChange={(e) => {
-              const value = e.target.value.trim()
-              onChange({ ...item, target_sets: value ? Number(value) : null })
-            }}
-          />
-        </div>
-        <div className="field grow">
-          <label className="label">Reps</label>
-          <input
-            inputMode="numeric"
-            value={item.target_reps ?? ''}
-            placeholder="Optional"
-            onChange={(e) => {
-              const value = e.target.value.trim()
-              onChange({ ...item, target_reps: value ? Number(value) : null })
-            }}
-          />
-        </div>
+        {!varyBySet && (
+          <div className="field grow">
+            <label className="label">Sets</label>
+            <input
+              inputMode="numeric"
+              value={item.target_sets ?? ''}
+              placeholder="Optional"
+              onChange={(e) => {
+                const value = e.target.value.trim()
+                onChange({ ...item, target_sets: value ? Number(value) : null })
+              }}
+            />
+          </div>
+        )}
+        {!varyBySet && (
+          <div className="field grow">
+            <label className="label">Reps</label>
+            <input
+              inputMode="numeric"
+              value={item.target_reps ?? ''}
+              placeholder="Optional"
+              onChange={(e) => {
+                const value = e.target.value.trim()
+                onChange({ ...item, target_reps: value ? Number(value) : null })
+              }}
+            />
+          </div>
+        )}
         <div className="field grow">
           <label className="label">Time</label>
           <input
@@ -91,7 +101,49 @@ function ItemFields({
             }}
           />
         </div>
+        {!varyBySet && (
+          <div className="field grow">
+            <label className="label">Weight</label>
+            <input
+              inputMode="decimal"
+              value={item.target_weight ?? ''}
+              placeholder="Optional"
+              onChange={(e) => {
+                const value = e.target.value.trim()
+                onChange({ ...item, target_weight: value ? Number(value) : null })
+              }}
+            />
+          </div>
+        )}
       </div>
+
+      <label className="checkbox">
+        <input
+          type="checkbox"
+          checked={varyBySet}
+          onChange={(e) => {
+            if (e.target.checked) {
+              const count = Math.max(1, item.target_sets ?? 1)
+              onChange({
+                ...item,
+                target_reps: null,
+                target_weight: null,
+                target_set_details: Array.from({ length: count }, () => ({ reps: null, weight: null })),
+              })
+            } else {
+              onChange({ ...item, target_set_details: null })
+            }
+          }}
+        />
+        Vary reps/weight by set
+      </label>
+
+      {varyBySet && (
+        <SetDetailRows
+          sets={item.target_set_details ?? []}
+          onChange={(next) => onChange({ ...item, target_set_details: next })}
+        />
+      )}
     </div>
   )
 }

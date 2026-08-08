@@ -56,9 +56,22 @@ export interface ExerciseEntry extends Syncable {
   reps: number | null
   duration_seconds: number | null
   weight: number | null
+  /** Per-set reps/weight, for a set that varies instead of being uniform
+   *  (e.g. a descending pyramid). Null means uniform -- the common case --
+   *  in which case `reps`/`weight` above hold the single value and `sets`
+   *  is a plain count. When set, it replaces `reps`/`weight` (both null)
+   *  and its length is `sets`. */
+  set_details: SetDetail[] | null
   notes: string | null
   performed_at: Iso
   session_id: string | null
+}
+
+/** One set's actuals or target. No identity of its own -- only exists
+ *  inside its entry's or template item's `set_details` array. */
+export interface SetDetail {
+  reps: number | null
+  weight: number | null
 }
 
 export interface DdrEntry extends Syncable {
@@ -93,6 +106,9 @@ export interface WorkoutTemplateItem {
   target_sets: number | null
   target_reps: number | null
   target_duration_seconds: number | null
+  target_weight: number | null
+  /** Per-set target reps/weight, mirroring ExerciseEntry.set_details. */
+  target_set_details: SetDetail[] | null
   notes: string | null
 }
 

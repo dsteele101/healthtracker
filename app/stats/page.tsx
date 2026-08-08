@@ -122,7 +122,17 @@ function ExercisePanel({
   }, [entries, selected, cutoff])
 
   const repsPoints = useMemo<Point[]>(
-    () => scoped.filter((e) => e.reps !== null).map((e) => ({ at: e.performed_at, value: e.reps! })),
+    () =>
+      scoped
+        .map((e) => ({
+          at: e.performed_at,
+          // No single reps value for a varied entry, so chart the total
+          // across its sets instead -- the standard "volume" reading, and
+          // it's just `reps` again in the uniform case.
+          value:
+            e.reps ?? e.set_details?.reduce((sum, set) => sum + (set.reps ?? 0), 0) ?? null,
+        }))
+        .filter((p): p is Point => p.value !== null && p.value > 0),
     [scoped],
   )
   const durationPoints = useMemo<Point[]>(

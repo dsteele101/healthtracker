@@ -11,6 +11,17 @@ import type {
   WorkoutTemplate,
 } from '@/lib/types'
 
+const SESSION_ENTRY_SET_DETAILS = [
+  { reps: 15, weight: 30 },
+  { reps: 12, weight: 25 },
+  { reps: 10, weight: 20 },
+]
+
+const TEMPLATE_ITEM_TARGET_SET_DETAILS = [
+  { reps: 10, weight: null },
+  { reps: 8, weight: null },
+]
+
 interface Result {
   label: string
   ok: boolean
@@ -45,6 +56,7 @@ function makeEntry(typeId: string, overrides: Partial<ExerciseEntry> = {}): Exer
     reps: 10,
     duration_seconds: null,
     weight: null,
+    set_details: null,
     notes: null,
     performed_at: iso(),
     session_id: null,
@@ -235,9 +247,11 @@ async function runTests(): Promise<Result[]> {
     items: [
       {
         exercise_type_id: freshType.id,
-        target_sets: 3,
-        target_reps: 10,
+        target_sets: null,
+        target_reps: null,
         target_duration_seconds: null,
+        target_weight: null,
+        target_set_details: TEMPLATE_ITEM_TARGET_SET_DETAILS,
         notes: null,
       },
     ],
@@ -251,6 +265,8 @@ async function runTests(): Promise<Result[]> {
   await local.put('workout_sessions', roundtripSession)
 
   const sessionEntry = makeEntry(freshType.id, {
+    reps: null,
+    set_details: SESSION_ENTRY_SET_DETAILS,
     notes: 'roundtrip session entry',
     session_id: roundtripSession.id,
   })
@@ -302,7 +318,9 @@ async function runTests(): Promise<Result[]> {
     'workout template items survive the jsonb round trip',
     pulledTemplate?.items.length === 1 &&
       pulledTemplate.items[0].exercise_type_id === freshType.id &&
-      pulledTemplate.items[0].target_sets === 3,
+      pulledTemplate.items[0].target_set_details?.length === 2 &&
+      // Server-derived from the array's length, proving that survived too.
+      pulledTemplate.items[0].target_sets === 2,
     JSON.stringify(pulledTemplate?.items),
   )
 
@@ -321,6 +339,14 @@ async function runTests(): Promise<Result[]> {
     'exercise entry keeps its session link',
     pulledSessionEntry?.session_id === roundtripSession.id,
     pulledSessionEntry?.session_id ?? 'null',
+  )
+  check(
+    'exercise entry set_details survive the jsonb round trip',
+    pulledSessionEntry?.set_details?.length === 3 &&
+      pulledSessionEntry.set_details[0].reps === 15 &&
+      // Server-derived from the array's length, proving that survived too.
+      pulledSessionEntry.sets === 3,
+    JSON.stringify(pulledSessionEntry),
   )
 
   // --- identity -------------------------------------------------------------
