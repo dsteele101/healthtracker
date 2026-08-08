@@ -16,12 +16,28 @@ import type {
 } from './types'
 
 export const EXPORT_FORMAT = 'healthtracker-export'
-export const EXPORT_VERSION = 1
+/** 2 added `exported_by`. */
+export const EXPORT_VERSION = 2
 
 export interface ExportFile {
   format: typeof EXPORT_FORMAT
   version: number
   exported_at: string
+  /* Which account these rows belong to.
+   *
+   * Rows keep their ids through an export and back, which is the point — that is
+   * how tombstones line up and how an entry still finds its session. It also
+   * means a file carries ids the server has already assigned an owner. Importing
+   * someone else's backup would queue rows that every future push rejects, and
+   * they would sit in the timeline forever looking like a sync fault.
+   *
+   * Re-assigning ids on import would "fix" that by breaking restore, which is the
+   * one job this file has. Recording who it came from and declining to merge it
+   * elsewhere costs nothing and keeps restore exact.
+   *
+   * Optional because version 1 files predate multi-user: there was one account,
+   * so a v1 file is by construction the reader's own. */
+  exported_by?: { id: string; email: string }
   exercise_types: ExerciseType[]
   workout_templates: WorkoutTemplate[]
   workout_sessions: WorkoutSession[]
@@ -48,19 +64,22 @@ export async function buildExport(): Promise<ExportFile> {
    * that still holds a deleted row would silently bring it back — the restore
    * has no way to say "this was removed" and the surviving copy wins on the
    * next sync. A backup that resurrects deleted data isn't a backup. */
-  const [types, templates, sessions, exercises, ddr, songs] = await Promise.all([
+  const [types, templates, sessions, exercises, ddr, songs, identity] = await Promise.all([
     local.allIncludingDeleted<ExerciseType>('exercise_types'),
     local.allIncludingDeleted<WorkoutTemplate>('workout_templates'),
     local.allIncludingDeleted<WorkoutSession>('workout_sessions'),
     local.allIncludingDeleted<ExerciseEntry>('exercise_entries'),
     local.allIncludingDeleted<DdrEntry>('ddr_entries'),
     local.songs(),
+    // Read locally, never fetched: this has to work with the server down.
+    local.getIdentity(),
   ])
 
   return {
     format: EXPORT_FORMAT,
     version: EXPORT_VERSION,
     exported_at: new Date().toISOString(),
+    ...(identity ? { exported_by: identity } : {}),
     exercise_types: clean(types),
     workout_templates: clean(templates),
     workout_sessions: clean(sessions),
@@ -240,6 +259,26 @@ export async function importExport(text: string): Promise<ImportResult> {
     throw new Error(
       `That export is version ${file.version}, newer than this app understands (${EXPORT_VERSION}).`,
     )
+  }
+
+  /* Restoring your own backup is the whole point of this. Merging somebody
+   * else's is a different thing wearing the same clothes: the rows carry ids the
+   * server has already assigned to them, so every one would be refused on the
+   * next push and then sit here looking like a bug.
+   *
+   * A version 1 file has no owner recorded because there was only one account
+   * when it was written, so it is the reader's own by construction.
+   *
+   * No override. There is no version of "yes, merge it anyway" that ends with
+   * the rows syncing. */
+  const owner = file.exported_by
+  if (owner && typeof owner.id === 'string') {
+    const identity = await local.getIdentity()
+    if (identity && identity.id !== owner.id) {
+      throw new Error(
+        `That export belongs to ${owner.email}. Importing it here would create entries this account can’t sync.`,
+      )
+    }
   }
 
   let imported = 0

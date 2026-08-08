@@ -70,7 +70,8 @@ pg pg_restore -U "$PGUSER" -d "$SCRATCH_DB" --no-owner --no-privileges \
 log "restored into scratch database, counting rows"
 
 FAILED=0
-for table in exercise_types exercise_entries ddr_entries ddr_songs; do
+# Same list as scripts/backup.sh; keep the two in step with db/migrations.
+for table in users exercise_types exercise_entries ddr_entries workout_templates workout_sessions; do
   restored=$(psql_scratch "SELECT count(*) FROM $table;" | tr -d '[:space:]')
   live=$(pg psql -U "$PGUSER" -d "$PGDATABASE" \
     -tAc "SELECT count(*) FROM $table;" | tr -d '[:space:]')

@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import { configuredProviderName, getProvider, isClientSideProvider } from '@/lib/ocr'
 
 /** Refuse anything larger than a phone photo. */
@@ -5,9 +6,16 @@ const MAX_BYTES = 12 * 1024 * 1024
 
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/heic'])
 
+/* Both handlers are gated even though neither touches a user's rows. A server
+ * OCR provider bills per call against a key in this app's environment, so an
+ * unauthenticated POST here spends someone's money. */
+
 /** Reports what photo import can do right now, so the form knows whether to
  *  offer the camera at all rather than failing after the user takes a photo. */
-export async function GET() {
+export async function GET(request: Request) {
+  const auth = await requireUser(request)
+  if (!auth.ok) return auth.response
+
   const name = configuredProviderName()
   return Response.json({
     provider: name,
@@ -17,6 +25,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const auth = await requireUser(request)
+  if (!auth.ok) return auth.response
+
   const provider = getProvider()
   if (!provider) {
     // Not a server error: this is the documented "no credential configured"

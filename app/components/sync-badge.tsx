@@ -42,6 +42,11 @@ export function SyncBadge() {
         return { label: `Server down · ${suffix}`, tone: '' }
       case 'auth-required':
         return { label: 'Sign in again', tone: 'pill-warn' }
+      case 'identity-mismatch':
+        // Nothing has been sent and nothing will be until this is resolved, so
+        // this has to say enough to act on. The choice itself lives on /data,
+        // next to the export that makes it safe.
+        return { label: `Signed in as ${outcome.email} · open Data`, tone: 'pill-warn' }
       case 'error':
         return { label: `Sync error · ${suffix}`, tone: 'pill-warn' }
       default:

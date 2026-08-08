@@ -84,8 +84,13 @@ pg pg_restore --list < "$TARGET.partial" > /dev/null 2>&1 \
 
 # Confirm the tables that matter are actually in there. A dump of an empty or
 # wrong database would pass the size and format checks above.
+#
+# Keep this list in step with db/migrations. It silently missed workout_templates
+# and workout_sessions between migrations 009/010 and 011, which is exactly the
+# failure this check exists to catch -- a backup can only verify what it is told
+# to look for.
 TOC=$(pg pg_restore --list < "$TARGET.partial" 2>/dev/null)
-for table in exercise_types exercise_entries ddr_entries ddr_songs; do
+for table in users exercise_types exercise_entries ddr_entries workout_templates workout_sessions; do
   grep -q "TABLE DATA public $table" <<<"$TOC" \
     || die "dump is missing table data for $table"
 done

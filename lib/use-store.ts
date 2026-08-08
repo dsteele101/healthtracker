@@ -2,12 +2,21 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import * as local from './local-db'
-import { startAutoSync, pendingCount, sync, type SyncOutcome } from './sync'
+import {
+  discardAndAdopt,
+  getOutcome,
+  startAutoSync,
+  pendingCount,
+  subscribeOutcome,
+  sync,
+  type SyncOutcome,
+} from './sync'
 import type {
   DdrEntry,
   DdrSong,
   ExerciseEntry,
   ExerciseType,
+  MeResponse,
   SyncTable,
   WorkoutSession,
   WorkoutTemplate,
@@ -150,21 +159,62 @@ export function useSongs(): DdrSong[] {
   return rows
 }
 
+/** The signed-in account, or null until it's known.
+ *
+ *  Two sources on purpose. The id recorded in the local store is available
+ *  offline and instantly, which is what makes this safe to render in the first
+ *  paint; /api/me carries the address worth showing but needs the network. So
+ *  the hook can report "signed in, offline, don't know the address yet", which
+ *  is a real state on a phone in a gym. */
+export function useIdentity(): MeResponse | null {
+  const [me, setMe] = useState<MeResponse | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    void local.getIdentity().then((stored) => {
+      if (cancelled || !stored) return
+      setMe((current) => current ?? { ...stored, display_name: null })
+    })
+
+    void fetch('/api/me')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((user: MeResponse | null) => {
+        if (!cancelled && user) setMe(user)
+      })
+      .catch(() => {
+        // Offline. Whatever the local store gave us stands.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return me
+}
+
 export interface SyncState {
   outcome: SyncOutcome | null
   queued: number
   syncing: boolean
   syncNow: () => void
+  /** Give this device to whoever is signed in, discarding what's here. */
+  switchAccount: () => Promise<void>
 }
 
-/** Drives the sync indicator and the manual retry button. */
+/** Drives the sync indicator and the manual retry button.
+ *
+ *  Safe to call from more than one component on a page: the outcome is shared
+ *  module state and startAutoSync() refcounts, so they agree with each other and
+ *  only one loop runs. */
 export function useSync(): SyncState {
   const version = useStoreVersion()
-  const [outcome, setOutcome] = useState<SyncOutcome | null>(null)
+  const outcome = useSyncExternalStore(subscribeOutcome, getOutcome, () => null)
   const [queued, setQueued] = useState(0)
   const [syncing, setSyncing] = useState(false)
 
-  useEffect(() => startAutoSync(setOutcome), [])
+  useEffect(() => startAutoSync(), [])
 
   useEffect(() => {
     let cancelled = false
@@ -178,10 +228,17 @@ export function useSync(): SyncState {
 
   const syncNow = useCallback(() => {
     setSyncing(true)
-    void sync()
-      .then(setOutcome)
-      .finally(() => setSyncing(false))
+    void sync().finally(() => setSyncing(false))
   }, [])
 
-  return { outcome, queued, syncing, syncNow }
+  const switchAccount = useCallback(async () => {
+    setSyncing(true)
+    try {
+      await discardAndAdopt()
+    } finally {
+      setSyncing(false)
+    }
+  }, [])
+
+  return { outcome, queued, syncing, syncNow, switchAccount }
 }

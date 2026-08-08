@@ -6,13 +6,22 @@
  * have to be safe. */
 
 import * as local from './local-db'
-import { SYNC_TABLES, emptyPayload, type PullResponse, type PushResponse } from './types'
+import {
+  SYNC_TABLES,
+  emptyPayload,
+  type MeResponse,
+  type PullResponse,
+  type PushResponse,
+} from './types'
 
 export type SyncOutcome =
   | { status: 'synced'; pushed: number; pulled: number; rejected: number }
   | { status: 'offline' }
   | { status: 'unreachable' }
   | { status: 'auth-required' }
+  /** A different account is signed in than the one this device's rows belong
+   *  to, and there is unsynced work that switching would destroy. */
+  | { status: 'identity-mismatch'; email: string }
   | { status: 'error'; message: string }
 
 export type SyncStatus = SyncOutcome['status'] | 'syncing' | 'idle'
@@ -46,19 +55,130 @@ function classifyThrow(): SyncOutcome {
   return navigator.onLine ? { status: 'unreachable' } : { status: 'offline' }
 }
 
+/** Signed out, from the app's own gate rather than a redirect at the edge. */
+function isUnauthorized(response: Response): boolean {
+  return response.status === 401 || response.status === 403
+}
+
+/* Who the server says is calling. Kept separate from the sync payload because
+ * its answer decides whether pushing is safe at all. */
+async function identify(): Promise<{ ok: true; user: MeResponse } | { ok: false; outcome: SyncOutcome }> {
+  let response: Response
+  try {
+    response = await fetch('/api/me', FETCH_OPTIONS)
+  } catch {
+    return { ok: false, outcome: classifyThrow() }
+  }
+
+  if (isAuthRedirect(response) || isUnauthorized(response)) {
+    return { ok: false, outcome: { status: 'auth-required' } }
+  }
+  if (!response.ok) {
+    return { ok: false, outcome: { status: 'error', message: `identity failed: ${response.status}` } }
+  }
+  if (!isApiResponse(response)) return { ok: false, outcome: { status: 'auth-required' } }
+
+  return { ok: true, user: (await response.json()) as MeResponse }
+}
+
+/* Confirms this device's rows belong to whoever is signed in, before a single
+ * one of them is sent anywhere.
+ *
+ * IndexedDB is one database per browser, not one per account, so a browser that
+ * two people have both signed into holds one store. Pushing without checking
+ * would file the first person's queued rows under the second person's identity —
+ * the server stamps ownership from the request, so they would simply become the
+ * second person's data, with nothing to undo it.
+ *
+ * This lives at the top of run() rather than in a boot effect on purpose.
+ * startAutoSync() fires a sync immediately, and a check racing it that loses has
+ * already lost the data.
+ *
+ * Three cases, and the ordering of the guards is the whole point:
+ *
+ *   - Cannot reach the server, or not signed in: return, change nothing. An
+ *     unreachable server is not evidence about identity, and wiping on it would
+ *     turn a flaky connection into data loss.
+ *   - No identity recorded yet: adopt it. Normal on a first run, and after
+ *     wipe(), which clears meta along with everything else.
+ *   - Recorded identity disagrees: the device belongs to someone else. Clear it
+ *     — but never over the top of unsynced work. Rows that exist nowhere but
+ *     this device are exactly what a backup is for, so refuse and say so
+ *     instead, and let /data offer an export first. */
+async function reconcileIdentity(): Promise<SyncOutcome | undefined> {
+  const me = await identify()
+  if (!me.ok) return me.outcome
+
+  const identity = { id: me.user.id, email: me.user.email }
+  const stored = await local.getIdentity()
+
+  if (stored === undefined) {
+    await local.setIdentity(identity)
+    return undefined
+  }
+  if (stored.id === me.user.id) {
+    // Same account. Refresh the address in case it changed at the provider.
+    if (stored.email !== identity.email) await local.setIdentity(identity)
+    return undefined
+  }
+
+  if ((await pendingCount()) > 0) {
+    return { status: 'identity-mismatch', email: me.user.email }
+  }
+
+  await local.wipe()
+  // Order matters: wipe() drops meta too, so both of these are writes into a
+  // fresh database rather than overwrites.
+  await local.setIdentity(identity)
+  await local.setCursor('0')
+  return undefined
+}
+
 let inFlight: Promise<SyncOutcome> | undefined
+
+/* How the last attempt went, shared by everything that displays it.
+ *
+ * Module state rather than per-component state because more than one component
+ * shows this at once -- the badge on every screen, and the account card on
+ * /data. Two copies drift: resolving something on one leaves the other still
+ * reporting the problem, which is worse than not showing it at all. Same
+ * subscribe/snapshot shape as the local store, for the same reason. */
+let lastOutcome: SyncOutcome | null = null
+const outcomeListeners = new Set<() => void>()
+
+export function subscribeOutcome(listener: () => void): () => void {
+  outcomeListeners.add(listener)
+  return () => outcomeListeners.delete(listener)
+}
+
+export function getOutcome(): SyncOutcome | null {
+  return lastOutcome
+}
+
+function record(outcome: SyncOutcome): SyncOutcome {
+  lastOutcome = outcome
+  for (const listener of outcomeListeners) listener()
+  return outcome
+}
 
 /** Push then pull. Concurrent calls share one run rather than racing. */
 export function sync(): Promise<SyncOutcome> {
-  inFlight ??= run().finally(() => {
-    inFlight = undefined
-  })
+  inFlight ??= run()
+    .then(record)
+    .finally(() => {
+      inFlight = undefined
+    })
   return inFlight
 }
 
 async function run(): Promise<SyncOutcome> {
   let pushed = 0
   let rejected = 0
+
+  // --- identity --------------------------------------------------------------
+  // Before anything leaves the device.
+  const mismatch = await reconcileIdentity()
+  if (mismatch) return mismatch
 
   // --- push ------------------------------------------------------------------
   const outbox = await local.pending()
@@ -77,7 +197,7 @@ async function run(): Promise<SyncOutcome> {
       return classifyThrow()
     }
 
-    if (isAuthRedirect(response)) return { status: 'auth-required' }
+    if (isAuthRedirect(response) || isUnauthorized(response)) return { status: 'auth-required' }
     if (!response.ok) {
       return { status: 'error', message: `push failed: ${response.status}` }
     }
@@ -110,7 +230,7 @@ async function run(): Promise<SyncOutcome> {
     return classifyThrow()
   }
 
-  if (isAuthRedirect(response)) return { status: 'auth-required' }
+  if (isAuthRedirect(response) || isUnauthorized(response)) return { status: 'auth-required' }
   if (!response.ok) {
     return { status: 'error', message: `pull failed: ${response.status}` }
   }
@@ -140,6 +260,17 @@ async function run(): Promise<SyncOutcome> {
     } catch {
       continue
     }
+
+    /* 409 is the one failure worth acting on rather than retrying: the server
+     * has no entry with this id on this account, and never will. That happens
+     * when the entry itself was rejected during push — rejections ride along in
+     * a 200 response body, so the photo loop still runs for a row that did not
+     * land. The entry is already flagged in the UI; leaving its photo queued
+     * would retry it every five minutes forever. */
+    if (photoResponse.status === 409) {
+      await local.clearPhoto(photo.entry_id)
+      continue
+    }
     if (!photoResponse.ok || isAuthRedirect(photoResponse) || !isApiResponse(photoResponse)) {
       continue
     }
@@ -158,21 +289,56 @@ export async function resync(): Promise<SyncOutcome> {
   return sync()
 }
 
+/** Hand this device over to whoever is signed in now, discarding what is here.
+ *
+ *  The deliberate way out of an 'identity-mismatch', for someone who has taken
+ *  an export first or does not want what is queued. Everything reconcileIdentity
+ *  refuses to do on its own, done on purpose. */
+export async function discardAndAdopt(): Promise<SyncOutcome> {
+  await local.wipe()
+  // Goes through sync(), so the result is recorded and every component showing
+  // the mismatch stops showing it.
+  return sync()
+}
+
 /** Number of rows waiting to reach the server. */
 export async function pendingCount(): Promise<number> {
   const outbox = await local.pending()
   return SYNC_TABLES.reduce((n, t) => n + outbox[t].length, 0)
 }
 
+/* One loop, however many components ask for it.
+ *
+ * Every screen mounts the sync badge, and /data mounts an account card as well.
+ * Without this, each would install its own timer, listeners and store
+ * subscription, and a page with two of them would sync twice as often for no
+ * benefit. Results reach everyone through subscribeOutcome regardless. */
+let autoSyncUsers = 0
+let stopAutoSync: (() => void) | undefined
+
 /** Syncs after local edits, on reconnect, on tab focus, and on a slow timer. */
-export function startAutoSync(onOutcome?: (outcome: SyncOutcome) => void): () => void {
+export function startAutoSync(): () => void {
+  autoSyncUsers += 1
+  if (autoSyncUsers === 1) stopAutoSync = beginAutoSync()
+
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    autoSyncUsers -= 1
+    if (autoSyncUsers === 0) {
+      stopAutoSync?.()
+      stopAutoSync = undefined
+    }
+  }
+}
+
+function beginAutoSync(): () => void {
   let stopped = false
 
   const attempt = () => {
     if (stopped) return
-    void sync().then((outcome) => {
-      if (!stopped) onOutcome?.(outcome)
-    })
+    void sync()
   }
 
   const onVisible = () => {

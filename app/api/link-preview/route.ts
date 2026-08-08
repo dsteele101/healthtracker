@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import type { LinkPreview } from '@/lib/link-preview'
 
 /* Fetches a linked page server-side and scrapes its Open Graph tags for a
@@ -9,8 +10,10 @@ import type { LinkPreview } from '@/lib/link-preview'
 const MAX_BYTES = 200_000
 const FETCH_TIMEOUT_MS = 6000
 
-// The link is typed in by this app's own single user, but still: don't let it
-// point the server at its own network.
+// This fetches whatever URL it is handed, so it must not become an open proxy
+// into the network the server sits on. The denylist mattered even when one
+// person typed every link; now that the caller is any authorized account, it is
+// the only thing scoping where this can reach.
 const LOCAL_HOSTNAME_RE =
   /^(localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|::1|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|169\.254(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})$/i
 
@@ -65,6 +68,9 @@ function empty(hostname: string): LinkPreview {
 }
 
 export async function GET(request: Request) {
+  const auth = await requireUser(request)
+  if (!auth.ok) return auth.response
+
   const raw = new URL(request.url).searchParams.get('url')
   if (!raw) return Response.json({ error: 'url is required' }, { status: 400 })
 

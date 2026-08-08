@@ -72,11 +72,73 @@ Zero Trust → **Access → Applications → Add a self-hosted application**:
 > internet with no authentication at all. Do both in one sitting, or add the
 > Access application before running `tunnel route dns`.
 
-The app itself has no login screen, no sessions, and no user table — Access is
-the only thing standing between the internet and your data. That is the trade
-that removed all of that code.
+The app still has no login screen, no password, and no session table — Access
+does the authenticating. What it does have is a `users` table, because it now
+reads the identity Access established rather than assuming there is only one
+person behind it.
 
-### 1.4 Notes
+### 1.4 Tell the app who Access says you are
+
+Access signs a JWT and sends it on every request it proxies. The app verifies
+that signature and reads the email claim. Two values are needed for that, both
+required — with either missing, every data route returns 503 rather than falling
+open:
+
+| Variable | Where to find it |
+| --- | --- |
+| `CF_ACCESS_TEAM_DOMAIN` | The `<team>.cloudflareaccess.com` hostname you log in at. No scheme. |
+| `CF_ACCESS_AUD` | Access → Applications → `tracker.dsteele.net` → **Overview** → *Application Audience (AUD) Tag*. |
+
+Put both in `.env`. `docker-compose.yml` guards them with `:?`, so a missing
+value fails `docker compose up` immediately instead of becoming a 503 on every
+request an hour later.
+
+The AUD tag is what stops a token minted for a *different* Access application in
+the same account from opening this one, so it is not optional decoration.
+
+> The plaintext `Cf-Access-Authenticated-User-Email` header sitting next to the
+> JWT is deliberately ignored. `cloudflared` forwards client headers verbatim, so
+> anything reaching the app another way — a `curl` at `127.0.0.1:3000`, a second
+> tunnel — could set it to anything. Only the signature is evidence. A side
+> effect worth knowing: hitting `127.0.0.1:3000` directly no longer yields data.
+
+### 1.5 Adding a person
+
+Zero Trust → **Access → Applications → `tracker.dsteele.net` → Policies** → the
+Allow policy → add their address to the **Emails** rule.
+
+That is the whole procedure. They visit the URL, Access authenticates them, and
+the app creates their account on the first request. No redeploy, no restart, no
+second list to keep in step.
+
+What they get: their own entries, workouts, routines and DDR history, private to
+them. What they share: the **exercise catalog** — one list everyone picks from
+and can add to, so nobody re-creates "Push-up". Anyone can add or correct an
+exercise; only whoever added one can retire it.
+
+The free Access tier covers 50 users.
+
+### 1.6 Removing a person
+
+Remove their address from the Emails rule. That takes effect at the edge
+immediately and is all that's needed to cut off access.
+
+Their rows stay in the database. To delete them as well — foreign key order
+matters, and their contributions to the shared exercise catalog stay behind:
+
+```sql
+DELETE FROM exercise_entries WHERE user_id = :id;
+DELETE FROM ddr_entries      WHERE user_id = :id;
+DELETE FROM workout_sessions WHERE user_id = :id;
+DELETE FROM workout_templates WHERE user_id = :id;
+UPDATE exercise_types SET created_by = NULL WHERE created_by = :id;
+DELETE FROM users WHERE id = :id;
+```
+
+Their DDR photos are named after their `ddr_entries.id` values, so collect those
+before the first delete if you want to remove the files too.
+
+### 1.7 Notes
 
 - **No ports are opened.** The tunnel is an outbound connection from the server
   to Cloudflare, so the router firewall stays closed and this works behind CGNAT.
@@ -133,7 +195,11 @@ crontab -e
 - writes to a `.partial` name first, so an interrupted run never leaves a
   truncated file that later looks like a valid backup
 - **verifies** the dump before keeping it: size, archive readability, and the
-  presence of table data for all four tables
+  presence of table data for every table that holds data (`users`,
+  `exercise_types`, `exercise_entries`, `ddr_entries`, `workout_templates`,
+  `workout_sessions`). That list lives in both `scripts/backup.sh` and
+  `scripts/restore-check.sh` and has to be extended whenever a migration adds a
+  table — a backup only verifies what it is told to look for.
 - **prunes only after that verification passes**, so a broken run can't delete
   the good backups it was supposed to replace (retention: 30 days,
   `RETENTION_DAYS` to change)
@@ -272,7 +338,14 @@ docker compose logs -f app              # app logs, including migrations on boot
 systemctl status cloudflared            # tunnel connected
 tail -n 40 backups/backup.log           # last night's backup
 curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/   # 200 from the host
+curl -sS -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/api/me   # 401 from the host
 ```
+
+`/api/me` returning **401** is the check that the identity gate is on: bypassing
+the tunnel means no signed Access token, which means no data. A **503** there
+means `CF_ACCESS_TEAM_DOMAIN` or `CF_ACCESS_AUD` is missing or Cloudflare's
+signing keys are unreachable — the app is failing closed, look at the app logs.
+A **200** means the gate is off; fix that immediately.
 
 From outside, `https://tracker.dsteele.net` should present the Access login
 first. If it serves the app without asking, the Access policy is missing —

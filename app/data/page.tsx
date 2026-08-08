@@ -10,13 +10,21 @@ import {
   importExport,
   timestampedName,
 } from '@/lib/export'
-import { useDdrEntries, useExerciseEntries, useExerciseTypes } from '@/lib/use-store'
+import {
+  useDdrEntries,
+  useExerciseEntries,
+  useExerciseTypes,
+  useIdentity,
+  useSync,
+} from '@/lib/use-store'
 import { SyncBadge } from '../components/sync-badge'
 
 export default function DataPage() {
   const exercises = useExerciseEntries()
   const ddr = useDdrEntries()
   const exerciseTypes = useExerciseTypes()
+  const identity = useIdentity()
+  const { outcome, queued, switchAccount: adoptSignedInAccount } = useSync()
   const fileInput = useRef<HTMLInputElement>(null)
 
   const [message, setMessage] = useState<string | null>(null)
@@ -95,6 +103,19 @@ export default function DataPage() {
 
   const totalEntries = (exercises?.length ?? 0) + (ddr?.length ?? 0)
 
+  /* Someone else is signed in on this browser and there is unsynced work here.
+   * Sync refuses to act on its own in that state — see reconcileIdentity — so
+   * this is where the choice gets made, next to the export that makes discarding
+   * a decision rather than a loss. */
+  const mismatch = outcome?.status === 'identity-mismatch' ? outcome : null
+  const queuedLabel = queued === 1 ? '1 entry has' : `${queued} entries have`
+
+  const switchAccount = () =>
+    run('Switch account', async () => {
+      await adoptSignedInAccount()
+      return 'Switched account. This device now holds the signed-in account’s data.'
+    })
+
   return (
     <main className="page">
       <header className="spread">
@@ -107,6 +128,42 @@ export default function DataPage() {
           ? 'Loading…'
           : `${totalEntries} entries on this device.`}
       </p>
+
+      <section className="card stack">
+        <h2 className="subtitle">Account</h2>
+        {mismatch ? (
+          <>
+            <p className="hint">
+              This device holds {totalEntries} entries belonging to a different account,
+              and {queuedLabel} not reached the server yet. Nothing will sync until that
+              is resolved, so that work is not overwritten.
+            </p>
+            <button type="button" className="btn btn-block" onClick={exportJson} disabled={busy}>
+              Export JSON first
+            </button>
+            <button
+              type="button"
+              className="btn btn-block btn-danger"
+              onClick={switchAccount}
+              disabled={busy}
+            >
+              Discard and switch to {mismatch.email}
+            </button>
+            <p className="hint">
+              Switching clears this device&rsquo;s copy and downloads {mismatch.email}
+              &rsquo;s data instead. Anything not yet synced is gone for good.
+            </p>
+          </>
+        ) : (
+          <p className="hint">
+            {identity === null
+              ? 'Checking…'
+              : identity.email
+                ? `Signed in as ${identity.email}.`
+                : 'Signed in. Reconnect to confirm which account.'}
+          </p>
+        )}
+      </section>
 
       <section className="card stack">
         <h2 className="subtitle">Export</h2>

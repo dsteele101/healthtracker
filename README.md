@@ -7,8 +7,13 @@ self-hosted, that keeps working with no signal.
   then synced. Logging in a basement gym works exactly the same as at home.
 - **Self-hosted.** Next.js + Postgres in Docker on your own box, reached through
   a Cloudflare Tunnel at `tracker.dsteele.net`.
-- **No login.** Cloudflare Access authenticates at the edge, so the app has no
-  sign-in screen, no sessions, and no user table.
+- **No login screen.** Cloudflare Access authenticates at the edge, so there is
+  no sign-in page, no password, and no session table. The app verifies the token
+  Access signs and reads the email from it, so it knows which of the authorized
+  people is calling. Adding someone is one line in the Access policy.
+- **Private logs, shared exercises.** Entries, workouts and routines belong to
+  whoever logged them. The exercise catalog is one list everyone picks from and
+  adds to.
 - **Exportable.** JSON (complete, re-importable) and CSV (spreadsheet-friendly),
   generated on-device so they work with the server down.
 - **Photo import.** Snap a DDR results screen and the entry form pre-fills.

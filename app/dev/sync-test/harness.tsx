@@ -322,6 +322,73 @@ async function runTests(): Promise<Result[]> {
     pulledSessionEntry?.session_id ?? 'null',
   )
 
+  // --- identity -------------------------------------------------------------
+  // The sync above already proves the "no identity recorded" path works, since
+  // every wipe() in this file clears meta and the next sync has to adopt whoever
+  // is signed in rather than treating a blank store as a mismatch. Assert it
+  // directly so a regression names itself instead of failing ten checks up.
+  const adopted = await local.getIdentity()
+  check(
+    'sync adopts the signed-in account into an empty store',
+    adopted !== undefined && adopted.id.length > 0,
+    JSON.stringify(adopted),
+  )
+
+  /* Push a row, become somebody else, and try to take it.
+   *
+   * The only check here that exercises a second account, so it drives the dev
+   * user cookie directly. It restores the original identity at the end -- these
+   * tests must not leave the browser signed in as someone else. */
+  const victim = makeEntry(freshType.id)
+  await local.put('exercise_entries', victim)
+  const beforeSwitch = await sync()
+  check('row to be attacked syncs first', beforeSwitch.status === 'synced')
+
+  const original = adopted?.email
+  try {
+    await fetch('/dev/switch-user?email=harness-intruder@example.com', { redirect: 'manual' })
+
+    // Same id, newer updated_at. Last-write-wins would take it if ownership
+    // weren't checked first.
+    const stolen = { ...victim, notes: 'STOLEN', updated_at: iso(120_000) }
+    const attack = await fetch('/api/sync/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exercise_entries: [stolen] }),
+    })
+    const attackBody = (await attack.json()) as {
+      rejected: { table: string; id: string; reason: string }[]
+    }
+    check(
+      'a second account cannot overwrite the first account’s row',
+      attackBody.rejected.some((r) => r.id === victim.id && /another account/.test(r.reason)),
+      JSON.stringify(attackBody.rejected),
+    )
+
+    // And the local store refuses to send anything at all while it holds one
+    // account's unsynced rows and a different account is signed in.
+    await local.put('exercise_entries', makeEntry(freshType.id))
+    const blocked = await sync()
+    check(
+      'sync refuses to push one account’s queued rows under another',
+      blocked.status === 'identity-mismatch',
+      JSON.stringify(blocked),
+    )
+  } finally {
+    if (original) {
+      await fetch(`/dev/switch-user?email=${encodeURIComponent(original)}`, { redirect: 'manual' })
+    }
+  }
+
+  const untouched = await fetch(`/api/sync/pull?cursor=0`).then(
+    (r) => r.json() as Promise<{ exercise_entries: { id: string; notes: string | null }[] }>,
+  )
+  check(
+    'the attacked row still has its original contents on the server',
+    untouched.exercise_entries.find((e) => e.id === victim.id)?.notes === null,
+    JSON.stringify(untouched.exercise_entries.find((e) => e.id === victim.id)),
+  )
+
   return results
 }
 

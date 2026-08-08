@@ -304,6 +304,49 @@ export async function setCursor(cursor: string): Promise<void> {
   await done(tx)
 }
 
+// --- identity ----------------------------------------------------------------
+
+/** Whose rows these are. */
+export interface StoredIdentity {
+  id: string
+  email: string
+}
+
+/* Which account the rows in this database belong to.
+ *
+ * There is one database per browser, not one per account -- the name is a
+ * constant, because every screen opens it and renders from it before any network
+ * request happens, and a name that had to be fetched first would cost exactly the
+ * instant offline start the whole design exists for.
+ *
+ * So the store has to be told whose it is. lib/sync.ts compares this against the
+ * server before every push; a disagreement means somebody else signed in on this
+ * browser, and the local rows have to go before anything is sent, or they would
+ * be pushed under the new identity and become that person's data.
+ *
+ * The address is kept alongside the id so that the parts of the app that name
+ * the account -- the Data screen, and the owner stamped into an export file --
+ * keep working with no network. Export in particular is the disaster-recovery
+ * path and must never need the server.
+ *
+ * undefined means "not yet known" and is the normal state on a first run and
+ * immediately after wipe(), which clears this along with everything else. */
+export async function getIdentity(): Promise<StoredIdentity | undefined> {
+  const conn = await db()
+  const tx = conn.transaction(META_STORE, 'readonly')
+  const row = await promisify<{ key: string; value: StoredIdentity } | undefined>(
+    tx.objectStore(META_STORE).get('identity'),
+  )
+  return row?.value
+}
+
+export async function setIdentity(identity: StoredIdentity): Promise<void> {
+  const conn = await db()
+  const tx = conn.transaction(META_STORE, 'readwrite')
+  tx.objectStore(META_STORE).put({ key: 'identity', value: identity })
+  await done(tx)
+}
+
 // --- ddr song corpus ---------------------------------------------------------
 
 export async function songs(): Promise<DdrSong[]> {
@@ -391,7 +434,12 @@ export async function attachPhoto(entryId: string, photoPath: string): Promise<v
   notify()
 }
 
-/** Test/reset hook. */
+/** Test/reset hook, and how a device is handed over to a different account.
+ *
+ *  Drops the whole database, `meta` included — so the stored cursor and user id
+ *  go with it, and the next sync starts from nothing and re-adopts whoever is
+ *  signed in. Callers switching accounts must set both again afterwards, in that
+ *  order; see the identity check in lib/sync.ts. */
 export async function wipe(): Promise<void> {
   // The open connection has to be closed first. deleteDatabase against a live
   // connection fires onblocked and never completes, which hangs the caller.

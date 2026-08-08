@@ -8,6 +8,20 @@ export type DifficultyScale = 'old' | 'new'
 /** 1-10 before DDR X, 1-20 after. */
 export const MAX_DIFFICULTY: Record<DifficultyScale, number> = { old: 10, new: 20 }
 
+/* Note what is deliberately absent below: none of the syncable interfaces carry
+ * a `user_id`, and none should.
+ *
+ * These types are three things at once -- the shape of a row in IndexedDB, the
+ * shape on the wire, and the shape inside an export file. Ownership is none of
+ * those. It is a server-side column, stamped from the verified identity on the
+ * way in and never selected on the way out. The client holds only its own rows,
+ * so it has nothing to disambiguate.
+ *
+ * Adding it, even optionally, would make `row.user_id` typecheck inside the push
+ * route's params() -- which is precisely the bug that keeps a caller from
+ * choosing whose data they are writing. Leaving it out means the compiler only
+ * permits the safe form. */
+
 /** Fields every syncable row carries. */
 interface Syncable {
   id: string
@@ -121,6 +135,14 @@ export const SYNC_TABLES: SyncTable[] = [
 export interface PullResponse extends SyncPayload {
   /** Cursor to pass to the next pull. */
   cursor: string
+}
+
+/** Identity of the signed-in account, from /api/me. Genuinely a wire shape, so
+ *  unlike user_id (see the note above Syncable) it belongs here. */
+export interface MeResponse {
+  id: string
+  email: string
+  display_name: string | null
 }
 
 export interface PushResponse {
