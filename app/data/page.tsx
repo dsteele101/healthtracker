@@ -17,7 +17,7 @@ import {
   useIdentity,
   useSync,
 } from '@/lib/use-store'
-import { SyncBadge } from '../components/sync-badge'
+import { HeaderActions } from '../components/header-actions'
 
 export default function DataPage() {
   const exercises = useExerciseEntries()
@@ -120,7 +120,7 @@ export default function DataPage() {
     <main className="page">
       <header className="spread">
         <h1 className="title">Data</h1>
-        <SyncBadge />
+        <HeaderActions />
       </header>
 
       <p className="muted">

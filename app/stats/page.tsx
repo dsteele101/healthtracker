@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { formatDay, formatDuration } from '@/lib/format'
 import { useDdrEntries, useExerciseEntries, useExerciseTypes, useSongs } from '@/lib/use-store'
 import type { DdrEntry, ExerciseEntry } from '@/lib/types'
-import { SyncBadge } from '../components/sync-badge'
+import { HeaderActions } from '../components/header-actions'
 import { MetricSection } from '../components/metric-section'
 import type { Point } from '../components/trend-chart'
 
@@ -58,7 +58,7 @@ export default function StatsPage() {
     <main className="page">
       <header className="spread">
         <h1 className="title">Analytics</h1>
-        <SyncBadge />
+        <HeaderActions />
       </header>
 
       <div className="seg" role="group" aria-label="Analytics section">

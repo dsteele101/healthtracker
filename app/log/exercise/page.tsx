@@ -7,7 +7,7 @@ import * as local from '@/lib/local-db'
 import { fromDatetimeLocal, parseDuration, toDatetimeLocal } from '@/lib/format'
 import { useActiveSession, useExerciseTypes } from '@/lib/use-store'
 import type { ExerciseEntry } from '@/lib/types'
-import { SyncBadge } from '../../components/sync-badge'
+import { HeaderActions } from '../../components/header-actions'
 
 const LAST_TYPE_KEY = 'tracker:last-exercise-type'
 
@@ -141,7 +141,7 @@ export default function LogExercisePage() {
     <main className="page">
       <header className="spread">
         <h1 className="title">Log exercise</h1>
-        <SyncBadge />
+        <HeaderActions />
       </header>
 
       <form onSubmit={save} className="stack">

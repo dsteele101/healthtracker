@@ -10,6 +10,7 @@ import {
   SYNC_TABLES,
   type DdrSong,
   type Iso,
+  type MeResponse,
   type SyncPayload,
   type SyncTable,
 } from './types'
@@ -306,11 +307,13 @@ export async function setCursor(cursor: string): Promise<void> {
 
 // --- identity ----------------------------------------------------------------
 
-/** Whose rows these are. */
-export interface StoredIdentity {
-  id: string
-  email: string
-}
+/** Whose rows these are, plus how to show them.
+ *
+ *  Deliberately the same shape /api/me returns rather than a trimmed copy: the
+ *  whole point is to render the header without waiting for that request, and a
+ *  narrower local shape would mean the name or picture popping in a beat late on
+ *  every cold start. */
+export type StoredIdentity = MeResponse
 
 /* Which account the rows in this database belong to.
  *
@@ -345,6 +348,12 @@ export async function setIdentity(identity: StoredIdentity): Promise<void> {
   const tx = conn.transaction(META_STORE, 'readwrite')
   tx.objectStore(META_STORE).put({ key: 'identity', value: identity })
   await done(tx)
+  /* Unlike the cursor, this is rendered -- the header shows the name and
+   * picture. Notifying means editing the profile updates every screen through
+   * the same subscription everything else already uses, rather than needing a
+   * second channel for one field. Costs a debounced pendingCount() check in the
+   * sync loop, which finds nothing and stops. */
+  notify()
 }
 
 // --- ddr song corpus ---------------------------------------------------------

@@ -6,7 +6,7 @@ import * as local from '@/lib/local-db'
 import { formatDuration, parseDuration } from '@/lib/format'
 import { useExerciseTypes, useWorkoutTemplates } from '@/lib/use-store'
 import type { ExerciseType, WorkoutTemplate, WorkoutTemplateItem } from '@/lib/types'
-import { SyncBadge } from '../components/sync-badge'
+import { HeaderActions } from '../components/header-actions'
 
 function emptyItem(exerciseTypeId: string): WorkoutTemplateItem {
   return {
@@ -247,7 +247,7 @@ export default function RoutinesPage() {
     <main className="page">
       <header className="spread">
         <h1 className="title">Routines</h1>
-        <SyncBadge />
+        <HeaderActions />
       </header>
 
       {types !== undefined && types.length === 0 ? (

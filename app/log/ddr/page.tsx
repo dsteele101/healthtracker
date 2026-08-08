@@ -8,7 +8,7 @@ import { fromDatetimeLocal, parseDuration, toDatetimeLocal } from '@/lib/format'
 import { useActiveSession, useDdrEntries, useSongs } from '@/lib/use-store'
 import type { DdrFields } from '@/lib/ocr'
 import { MAX_DIFFICULTY, type DdrEntry, type DifficultyScale } from '@/lib/types'
-import { SyncBadge } from '../../components/sync-badge'
+import { HeaderActions } from '../../components/header-actions'
 import { PhotoImport } from './photo-import'
 
 const LAST_SCALE_KEY = 'tracker:last-difficulty-scale'
@@ -140,7 +140,7 @@ export default function LogDdrPage() {
     <main className="page">
       <header className="spread">
         <h1 className="title">Log DDR</h1>
-        <SyncBadge />
+        <HeaderActions />
       </header>
 
       <form onSubmit={save} className="stack">

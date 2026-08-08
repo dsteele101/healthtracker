@@ -27,8 +27,9 @@ import {
   type WorkoutSession,
 } from '@/lib/types'
 import { DEFAULT_EXERCISE_ICON } from '@/lib/exercise-icons'
-import { SyncBadge } from './components/sync-badge'
 import { DdrArrowIcon } from './components/ddr-arrow-icon'
+import { ExerciseIcon } from './components/exercise-icon'
+import { HeaderActions } from './components/header-actions'
 
 type EntryTable = Extract<SyncTable, 'exercise_entries' | 'ddr_entries'>
 type KindFilter = 'all' | EntryTable
@@ -567,7 +568,7 @@ function ExerciseEntryRow({
   return (
     <article className="card spread">
       <span className="type-icon" aria-hidden="true">
-        {item.icon ?? DEFAULT_EXERCISE_ICON}
+        <ExerciseIcon icon={item.icon ?? DEFAULT_EXERCISE_ICON} />
       </span>
       {item.exerciseTypeId ? (
         <Link href={`/exercise/${item.exerciseTypeId}`} className="grow">
@@ -962,7 +963,7 @@ export default function Home() {
     <main className="page">
       <header className="spread">
         <h1 className="title">Health Tracker</h1>
-        <SyncBadge />
+        <HeaderActions />
       </header>
 
       <div className="stack">

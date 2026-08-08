@@ -109,7 +109,7 @@ async function reconcileIdentity(): Promise<SyncOutcome | undefined> {
   const me = await identify()
   if (!me.ok) return me.outcome
 
-  const identity = { id: me.user.id, email: me.user.email }
+  const identity = me.user
   const stored = await local.getIdentity()
 
   if (stored === undefined) {
@@ -117,8 +117,17 @@ async function reconcileIdentity(): Promise<SyncOutcome | undefined> {
     return undefined
   }
   if (stored.id === me.user.id) {
-    // Same account. Refresh the address in case it changed at the provider.
-    if (stored.email !== identity.email) await local.setIdentity(identity)
+    /* Same account. Refresh the cached copy so a name or picture changed on
+     * another device shows up here, and so does an address changed at the
+     * identity provider. */
+    if (
+      stored.email !== identity.email ||
+      stored.display_name !== identity.display_name ||
+      stored.avatar_emoji !== identity.avatar_emoji ||
+      stored.avatar_path !== identity.avatar_path
+    ) {
+      await local.setIdentity(identity)
+    }
     return undefined
   }
 

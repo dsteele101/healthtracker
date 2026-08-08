@@ -13,7 +13,7 @@ import {
   useWorkoutTemplates,
 } from '@/lib/use-store'
 import type { DdrEntry, ExerciseEntry } from '@/lib/types'
-import { SyncBadge } from '../../components/sync-badge'
+import { HeaderActions } from '../../components/header-actions'
 
 export default function SessionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -134,7 +134,7 @@ export default function SessionDetailPage() {
     <main className="page">
       <header className="spread">
         <h1 className="title">{session.name ?? 'Workout session'}</h1>
-        <SyncBadge />
+        <HeaderActions />
       </header>
 
       {editing ? (

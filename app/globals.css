@@ -374,6 +374,13 @@ a:has(> .thumb):active .thumb {
   height: 100%;
 }
 
+/* Sized off font-size like the emoji it sits alongside in .type-icon and
+   .icon-choice, so it matches whichever slot it's rendered into. */
+.jump-rope-icon {
+  width: 1em;
+  height: 1em;
+}
+
 /* Visual cue for an exercise-entry row, same slot the DDR photo/fallback
    occupies so both entry kinds line up. */
 .type-icon {
@@ -781,6 +788,88 @@ button.pill:not(:disabled):active {
 }
 
 /* --- motion ------------------------------------------------------------------ */
+
+/* --- account menu ----------------------------------------------------------- */
+
+/* The right-hand side of every page header. Shrinks before the title does, and
+   never wraps the avatar onto its own line. */
+.header-actions {
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.profile-menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+/* Same 44px touch target as the icon choices, with the picture inset. */
+.avatar-btn {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 100ms ease;
+}
+
+.avatar-btn:active {
+  transform: scale(0.92);
+}
+
+.avatar-btn[aria-expanded='true'] {
+  border-color: var(--accent);
+}
+
+.avatar-img {
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-emoji {
+  line-height: 1;
+}
+
+.profile-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  /* Wider than the button it hangs off, but never wider than the screen on a
+     phone, where "right: 0" would otherwise push it off the left edge. */
+  width: min(320px, calc(100vw - 32px));
+  /* Above the sticky active-session bar (z-index 30), which is the only other
+     thing that overlaps content. */
+  z-index: 40;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+}
+
+.profile-identity {
+  align-items: center;
+}
+
+/* Reachable by a screen reader and by .click(), invisible to everyone else --
+   the file input is opened by the button below it, never touched directly. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* Wraps each route's content (see app/template.tsx), which Next.js remounts
    on every navigation — so this replays on every screen change. */

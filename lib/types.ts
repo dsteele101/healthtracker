@@ -143,6 +143,17 @@ export interface MeResponse {
   id: string
   email: string
   display_name: string | null
+  /** A picked preset emoji, or null. Never set at the same time as avatar_path. */
+  avatar_emoji: string | null
+  /** Filename of an uploaded picture; fetch it from /api/avatar/<path>. */
+  avatar_path: string | null
+}
+
+/** Body of a PATCH /api/me. Every field optional — omitted means "leave it".
+ *  Setting avatar_emoji clears any uploaded picture, and vice versa. */
+export interface ProfileUpdate {
+  display_name?: string | null
+  avatar_emoji?: string | null
 }
 
 export interface PushResponse {

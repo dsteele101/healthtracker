@@ -159,37 +159,26 @@ export function useSongs(): DdrSong[] {
   return rows
 }
 
-/** The signed-in account, or null until it's known.
+/** The signed-in account, or null before the first sync of a brand new store.
  *
- *  Two sources on purpose. The id recorded in the local store is available
- *  offline and instantly, which is what makes this safe to render in the first
- *  paint; /api/me carries the address worth showing but needs the network. So
- *  the hook can report "signed in, offline, don't know the address yet", which
- *  is a real state on a phone in a gym. */
+ *  Reads only from the local copy, never the network, so the header paints with
+ *  a name and picture on a cold offline launch instead of a beat later. Keeping
+ *  it current is already somebody's job: reconcileIdentity() fetches /api/me at
+ *  the top of every sync and writes the result here, and profile edits write it
+ *  straight through (see lib/profile.ts). Both notify, so this re-reads. */
 export function useIdentity(): MeResponse | null {
+  const version = useStoreVersion()
   const [me, setMe] = useState<MeResponse | null>(null)
 
   useEffect(() => {
     let cancelled = false
-
     void local.getIdentity().then((stored) => {
-      if (cancelled || !stored) return
-      setMe((current) => current ?? { ...stored, display_name: null })
+      if (!cancelled) setMe(stored ?? null)
     })
-
-    void fetch('/api/me')
-      .then((response) => (response.ok ? response.json() : null))
-      .then((user: MeResponse | null) => {
-        if (!cancelled && user) setMe(user)
-      })
-      .catch(() => {
-        // Offline. Whatever the local store gave us stands.
-      })
-
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [version])
 
   return me
 }

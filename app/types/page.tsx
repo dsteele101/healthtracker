@@ -7,7 +7,9 @@ import { useExerciseTypes } from '@/lib/use-store'
 import type { ExerciseType } from '@/lib/types'
 import { DEFAULT_EXERCISE_ICON, EXERCISE_ICON_PRESETS } from '@/lib/exercise-icons'
 import { parseInfoUrl } from '@/lib/info-url'
-import { SyncBadge } from '../components/sync-badge'
+import { ExerciseIcon } from '../components/exercise-icon'
+import { HeaderActions } from '../components/header-actions'
+import { IconPicker as SharedIconPicker } from '../components/icon-picker'
 import { InfoUrlField } from '../components/info-url-field'
 
 /** Preset grid plus a "no icon" option that clears back to the generic
@@ -20,29 +22,12 @@ function IconPicker({
   onChange: (icon: string | null) => void
 }) {
   return (
-    <div className="icon-grid">
-      <button
-        type="button"
-        className={`icon-choice ${value === null ? 'icon-choice-active' : ''}`}
-        aria-pressed={value === null}
-        aria-label="No icon"
-        onClick={() => onChange(null)}
-      >
-        <span className="muted">—</span>
-      </button>
-      {EXERCISE_ICON_PRESETS.map((icon) => (
-        <button
-          key={icon}
-          type="button"
-          className={`icon-choice ${value === icon ? 'icon-choice-active' : ''}`}
-          aria-pressed={value === icon}
-          aria-label={icon}
-          onClick={() => onChange(icon)}
-        >
-          {icon}
-        </button>
-      ))}
-    </div>
+    <SharedIconPicker
+      presets={EXERCISE_ICON_PRESETS}
+      value={value}
+      onChange={onChange}
+      renderIcon={(icon) => <ExerciseIcon icon={icon} />}
+    />
   )
 }
 
@@ -155,7 +140,7 @@ function TypeRow({ type }: { type: local.Local<ExerciseType> }) {
           onClick={startEditing}
         >
           <span className="type-icon" aria-hidden="true">
-            {type.icon ?? DEFAULT_EXERCISE_ICON}
+            <ExerciseIcon icon={type.icon ?? DEFAULT_EXERCISE_ICON} />
           </span>
         </button>
         <div className="grow">
@@ -295,7 +280,7 @@ export default function ExerciseTypesPage() {
     <main className="page">
       <header className="spread">
         <h1 className="title">Exercises</h1>
-        <SyncBadge />
+        <HeaderActions />
       </header>
 
       <form onSubmit={addType} className="card stack">

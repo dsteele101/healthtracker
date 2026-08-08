@@ -79,7 +79,9 @@ export async function buildExport(): Promise<ExportFile> {
     format: EXPORT_FORMAT,
     version: EXPORT_VERSION,
     exported_at: new Date().toISOString(),
-    ...(identity ? { exported_by: identity } : {}),
+    // Just enough to recognise the owner on import. The display name and picture
+    // are presentation, and would only go stale inside a file that outlives them.
+    ...(identity ? { exported_by: { id: identity.id, email: identity.email } } : {}),
     exercise_types: clean(types),
     workout_templates: clean(templates),
     workout_sessions: clean(sessions),

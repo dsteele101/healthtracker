@@ -116,6 +116,10 @@ them. What they share: the **exercise catalog** — one list everyone picks from
 and can add to, so nobody re-creates "Push-up". Anyone can add or correct an
 exercise; only whoever added one can retire it.
 
+Their account starts named after the local part of their address, with a default
+icon. Both are theirs to change from the account menu in the top right of any
+screen, which is also where they log out.
+
 The free Access tier covers 50 users.
 
 ### 1.6 Removing a person
@@ -324,9 +328,19 @@ engine, so a save made with no signal still succeeds and the photo catches up
 once the connection returns. It lands in the `photos` volume
 (`PHOTO_DIR`, default `/app/data/photos` in compose) named after the entry's
 id, and is served back through `/api/photos/<id>.jpg` — a route handler rather
-than a static file, so Access still gates it like everything else. Back it up
-the same way as `pgdata`; it isn't covered by `scripts/backup.sh`, which only
-dumps Postgres.
+than a static file, so Access still gates it like everything else. A photo is
+only served to the account whose entry it belongs to.
+
+**Profile pictures** share that volume, in `avatars/` beneath it. They are
+cropped to a square and scaled to 256px in the browser, and named with a fresh
+random id on each upload so a replaced picture can't be served from a cache. The
+previous file is deleted when a new one is uploaded or when the account switches
+back to a preset icon, so this directory holds at most one file per account.
+
+Back the volume up the same way as `pgdata`; it isn't covered by
+`scripts/backup.sh`, which only dumps Postgres. Losing it costs photos and
+profile pictures, not entries — the rows in Postgres survive and simply render
+without an image.
 
 ---
 

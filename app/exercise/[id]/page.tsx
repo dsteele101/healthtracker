@@ -9,7 +9,8 @@ import { useExerciseEntries, useExerciseTypes } from '@/lib/use-store'
 import type { ExerciseType } from '@/lib/types'
 import { DEFAULT_EXERCISE_ICON } from '@/lib/exercise-icons'
 import { parseInfoUrl } from '@/lib/info-url'
-import { SyncBadge } from '../../components/sync-badge'
+import { ExerciseIcon } from '../../components/exercise-icon'
+import { HeaderActions } from '../../components/header-actions'
 import { InfoUrlField } from '../../components/info-url-field'
 import { LinkPreview } from '../../components/link-preview'
 
@@ -106,13 +107,13 @@ export default function ExerciseDetailPage() {
     <main className="page">
       <header className="spread">
         <h1 className="title">{type.name}</h1>
-        <SyncBadge />
+        <HeaderActions />
       </header>
 
       <div className="card stack">
         <div className="row">
           <span className="type-icon" aria-hidden="true">
-            {type.icon ?? DEFAULT_EXERCISE_ICON}
+            <ExerciseIcon icon={type.icon ?? DEFAULT_EXERCISE_ICON} />
           </span>
           <div className="grow">
             <div className="subtitle">{type.name}</div>

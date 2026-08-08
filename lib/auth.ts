@@ -23,7 +23,15 @@ export interface AuthUser {
   id: string
   email: string
   display_name: string | null
+  /** A picked preset. Mutually exclusive with avatar_path; see migration 012. */
+  avatar_emoji: string | null
+  /** Filename of an uploaded picture, inside the avatars directory. */
+  avatar_path: string | null
 }
+
+/** Every column the app reads about an account, in one place so the two
+ *  provisioning queries and /api/me cannot drift apart. */
+export const USER_COLUMNS = 'id, email, display_name, avatar_emoji, avatar_path'
 
 /* A result rather than a thrown exception, so that forgetting to handle the
  * failure case is a type error at the call site instead of an unguarded throw
@@ -87,7 +95,19 @@ interface UserRow extends Record<string, unknown> {
   id: string
   email: string
   display_name: string | null
+  avatar_emoji: string | null
+  avatar_path: string | null
   last_seen_at: Date
+}
+
+function toUser(row: UserRow): AuthUser {
+  return {
+    id: row.id,
+    email: row.email,
+    display_name: row.display_name,
+    avatar_emoji: row.avatar_emoji,
+    avatar_path: row.avatar_path,
+  }
 }
 
 /* First request from a newly-authorized email creates the account. Access
@@ -96,7 +116,7 @@ interface UserRow extends Record<string, unknown> {
  * keep in sync with the Access policy. */
 async function provision(email: string): Promise<AuthUser> {
   const found = await query<UserRow>(
-    'SELECT id, email, display_name, last_seen_at FROM users WHERE lower(email) = lower($1)',
+    `SELECT ${USER_COLUMNS}, last_seen_at FROM users WHERE lower(email) = lower($1)`,
     [email],
   )
 
@@ -105,7 +125,7 @@ async function provision(email: string): Promise<AuthUser> {
     if (Date.now() - user.last_seen_at.getTime() > LAST_SEEN_INTERVAL_MS) {
       await query('UPDATE users SET last_seen_at = now() WHERE id = $1', [user.id])
     }
-    return { id: user.id, email: user.email, display_name: user.display_name }
+    return toUser(user)
   }
 
   /* ON CONFLICT DO NOTHING and then re-read, rather than DO UPDATE ... RETURNING:
@@ -118,11 +138,10 @@ async function provision(email: string): Promise<AuthUser> {
   )
 
   const created = await query<UserRow>(
-    'SELECT id, email, display_name, last_seen_at FROM users WHERE lower(email) = lower($1)',
+    `SELECT ${USER_COLUMNS}, last_seen_at FROM users WHERE lower(email) = lower($1)`,
     [email],
   )
-  const user = created[0]
-  return { id: user.id, email: user.email, display_name: user.display_name }
+  return toUser(created[0])
 }
 
 /** Identity for a request, or the response to return instead. */
