@@ -8,7 +8,6 @@ import { fromDatetimeLocal, parseDuration, toDatetimeLocal } from '@/lib/format'
 import { useActiveSession, useDdrEntries, useSongs } from '@/lib/use-store'
 import type { DdrFields } from '@/lib/ocr'
 import { MAX_DIFFICULTY, type DdrEntry, type DifficultyScale } from '@/lib/types'
-import { HeaderActions } from '../../components/header-actions'
 import { PhotoImport } from './photo-import'
 
 const LAST_SCALE_KEY = 'tracker:last-difficulty-scale'
@@ -138,10 +137,7 @@ export default function LogDdrPage() {
 
   return (
     <main className="page">
-      <header className="spread">
-        <h1 className="title">Log DDR</h1>
-        <HeaderActions />
-      </header>
+      <h1 className="title">Log DDR</h1>
 
       <form onSubmit={save} className="stack">
         <PhotoImport

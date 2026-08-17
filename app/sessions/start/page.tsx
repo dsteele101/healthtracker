@@ -6,7 +6,6 @@ import { useState } from 'react'
 import * as local from '@/lib/local-db'
 import { useActiveSession, useWorkoutTemplates } from '@/lib/use-store'
 import type { WorkoutSession } from '@/lib/types'
-import { HeaderActions } from '../../components/header-actions'
 
 export default function StartWorkoutPage() {
   const router = useRouter()
@@ -52,10 +51,7 @@ export default function StartWorkoutPage() {
   if (activeSession) {
     return (
       <main className="page">
-        <header className="spread">
-          <h1 className="title">Workout in progress</h1>
-          <HeaderActions />
-        </header>
+        <h1 className="title">Workout in progress</h1>
         <div className="empty">
           You already have &ldquo;{activeSession.name ?? 'a workout'}&rdquo; in progress.
         </div>
@@ -71,10 +67,7 @@ export default function StartWorkoutPage() {
 
   return (
     <main className="page">
-      <header className="spread">
-        <h1 className="title">Start workout</h1>
-        <HeaderActions />
-      </header>
+      <h1 className="title">Start workout</h1>
 
       <form onSubmit={start} className="stack">
         {templates && templates.length > 0 && (

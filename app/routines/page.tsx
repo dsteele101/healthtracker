@@ -6,7 +6,6 @@ import * as local from '@/lib/local-db'
 import { formatDuration, parseDuration } from '@/lib/format'
 import { useExerciseTypes, useWorkoutTemplates } from '@/lib/use-store'
 import type { ExerciseType, WorkoutTemplate, WorkoutTemplateItem } from '@/lib/types'
-import { HeaderActions } from '../components/header-actions'
 import { NumberField } from '../components/number-field'
 import { SetDetailRows } from '../components/set-detail-rows'
 
@@ -294,10 +293,7 @@ export default function RoutinesPage() {
 
   return (
     <main className="page">
-      <header className="spread">
-        <h1 className="title">Routines</h1>
-        <HeaderActions />
-      </header>
+      <h1 className="title">Routines</h1>
 
       {types !== undefined && types.length === 0 ? (
         <div className="empty">
@@ -366,9 +362,6 @@ export default function RoutinesPage() {
         ))}
       </section>
 
-      <Link href="/" className="btn btn-block">
-        Done
-      </Link>
     </main>
   )
 }

@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import * as local from '@/lib/local-db'
 import { useExerciseTypes } from '@/lib/use-store'
@@ -8,7 +7,6 @@ import type { ExerciseType } from '@/lib/types'
 import { DEFAULT_EXERCISE_ICON, EXERCISE_ICON_PRESETS } from '@/lib/exercise-icons'
 import { parseInfoUrl } from '@/lib/info-url'
 import { ExerciseIcon } from '../components/exercise-icon'
-import { HeaderActions } from '../components/header-actions'
 import { IconPicker as SharedIconPicker } from '../components/icon-picker'
 import { InfoUrlField } from '../components/info-url-field'
 
@@ -400,10 +398,7 @@ export default function ExerciseTypesPage() {
 
   return (
     <main className="page">
-      <header className="spread">
-        <h1 className="title">Exercises</h1>
-        <HeaderActions />
-      </header>
+      <h1 className="title">Exercises</h1>
 
       <form onSubmit={addType} className="card stack">
         <div className="field">
@@ -459,9 +454,6 @@ export default function ExerciseTypesPage() {
         ))}
       </section>
 
-      <Link href="/" className="btn btn-block">
-        Done
-      </Link>
     </main>
   )
 }

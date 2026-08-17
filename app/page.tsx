@@ -26,17 +26,14 @@ import {
   type ExerciseType,
   type SetDetail,
   type SyncTable,
-  type WorkoutSession,
 } from '@/lib/types'
 import { DEFAULT_EXERCISE_ICON } from '@/lib/exercise-icons'
 import { DdrArrowIcon } from './components/ddr-arrow-icon'
 import { ExerciseIcon } from './components/exercise-icon'
-import { HeaderActions } from './components/header-actions'
+import { ScoreRing } from './components/score-ring'
 import { SetDetailRows } from './components/set-detail-rows'
 
 type EntryTable = Extract<SyncTable, 'exercise_entries' | 'ddr_entries'>
-type KindFilter = 'all' | EntryTable
-type SortOrder = 'date-desc' | 'date-asc' | 'name-asc' | 'name-desc'
 
 /** A row in the combined timeline, flattened so both entry kinds render the
  *  same way: what it was, the numbers, when. */
@@ -62,12 +59,6 @@ interface TimelineItem {
   raw: local.Local<DdrEntry> | local.Local<ExerciseEntry>
 }
 
-const KIND_LABELS: Record<KindFilter, string> = {
-  all: 'All',
-  exercise_entries: 'Exercise',
-  ddr_entries: 'DDR',
-}
-
 // How many timeline rows render up front, and how many more each scroll-in
 // reveals. The full history still lives in IndexedDB and filters run against
 // all of it — this only limits how many cards get mounted at once, so a
@@ -82,17 +73,7 @@ function lengthToInput(seconds: number | null): string {
 /** Edits a saved DDR entry in place. Read view matches the original
  *  timeline card; edit view mirrors the fields and validation in
  *  app/log/ddr/page.tsx, since this is the same record shape. */
-function DdrEntryRow({
-  item,
-  selectMode = false,
-  selected = false,
-  onToggleSelect,
-}: {
-  item: TimelineItem
-  selectMode?: boolean
-  selected?: boolean
-  onToggleSelect?: () => void
-}) {
+function DdrEntryRow({ item, band }: { item: TimelineItem; band: 'a' | 'b' }) {
   const entry = item.raw as local.Local<DdrEntry>
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(entry.song_title)
@@ -308,14 +289,42 @@ function DdrEntryRow({
             Save
           </button>
         </div>
+        <button
+          type="button"
+          className="btn btn-danger btn-block"
+          onClick={() => {
+            if (confirm('Delete this entry?')) {
+              void local.remove('ddr_entries', entry.id)
+            }
+          }}
+        >
+          Delete
+        </button>
       </form>
     )
   }
 
   return (
-    <article className="card spread">
+    <article
+      className={`entry-row entry-row-${band} entry-row-tappable`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Edit ${item.heading}`}
+      onClick={startEditing}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          startEditing()
+        }
+      }}
+    >
       {item.photoPath ? (
-        <a href={`/api/photos/${item.photoPath}`} target="_blank" rel="noreferrer">
+        <a
+          href={`/api/photos/${item.photoPath}`}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element -- a
               thumbnail doesn't need next/image's pipeline. */}
           <img className="thumb thumb-ddr" src={`/api/photos/${item.photoPath}`} alt="" />
@@ -333,30 +342,8 @@ function DdrEntryRow({
       </div>
 
       <div className="row">
-        {selectMode ? (
-          <label className="checkbox" aria-label={`Select ${item.heading}`}>
-            <input type="checkbox" checked={selected} onChange={onToggleSelect} />
-          </label>
-        ) : (
-          <>
-            {item.pending && <span className="pill">Unsaved</span>}
-            <button type="button" className="btn" aria-label={`Edit ${item.heading}`} onClick={startEditing}>
-              Edit
-            </button>
-            <button
-              type="button"
-              className="btn btn-danger"
-              aria-label={`Delete ${item.heading}`}
-              onClick={() => {
-                if (confirm('Delete this entry?')) {
-                  void local.remove('ddr_entries', entry.id)
-                }
-              }}
-            >
-              Delete
-            </button>
-          </>
-        )}
+        <ScoreRing scorePct={entry.percentage_score} />
+        {item.pending && <span className="pill">Unsaved</span>}
       </div>
     </article>
   )
@@ -368,15 +355,11 @@ function DdrEntryRow({
 function ExerciseEntryRow({
   item,
   type,
-  selectMode = false,
-  selected = false,
-  onToggleSelect,
+  band,
 }: {
   item: TimelineItem
   type: local.Local<ExerciseType> | undefined
-  selectMode?: boolean
-  selected?: boolean
-  onToggleSelect?: () => void
+  band: 'a' | 'b'
 }) {
   const entry = item.raw as local.Local<ExerciseEntry>
   const [editing, setEditing] = useState(false)
@@ -607,62 +590,93 @@ function ExerciseEntryRow({
             Save
           </button>
         </div>
+        <button
+          type="button"
+          className="btn btn-danger btn-block"
+          onClick={() => {
+            if (confirm('Delete this entry?')) {
+              void local.remove('exercise_entries', entry.id)
+            }
+          }}
+        >
+          Delete
+        </button>
       </form>
     )
   }
 
   return (
-    <article className="card spread">
-      <span className="type-icon" aria-hidden="true">
-        <ExerciseIcon icon={item.icon ?? DEFAULT_EXERCISE_ICON} iconSvg={item.iconSvg} />
-      </span>
+    <article
+      className={`entry-row entry-row-${band} entry-row-tappable`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Edit ${item.heading}`}
+      onClick={startEditing}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          startEditing()
+        }
+      }}
+    >
       {item.exerciseTypeId ? (
-        <Link href={`/exercise/${item.exerciseTypeId}`} className="grow">
-          <div className="subtitle">{item.heading}</div>
-          {/* Metrics and timestamp on separate lines: joined into one they
-              wrap mid-date on a narrow phone, which reads as a mistake. */}
-          {item.detail && <div className="muted mono">{item.detail}</div>}
-          <div className="muted mono">{formatWhen(item.performedAt)}</div>
-          {item.note && <div className="muted">{item.note}</div>}
-          {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
+        <Link
+          href={`/exercise/${item.exerciseTypeId}`}
+          className="type-icon"
+          aria-label={`View ${item.heading}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ExerciseIcon icon={item.icon ?? DEFAULT_EXERCISE_ICON} iconSvg={item.iconSvg} />
         </Link>
       ) : (
-        <div className="grow">
-          <div className="subtitle">{item.heading}</div>
-          {item.detail && <div className="muted mono">{item.detail}</div>}
-          <div className="muted mono">{formatWhen(item.performedAt)}</div>
-          {item.note && <div className="muted">{item.note}</div>}
-          {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
-        </div>
+        <span className="type-icon" aria-hidden="true">
+          <ExerciseIcon icon={item.icon ?? DEFAULT_EXERCISE_ICON} iconSvg={item.iconSvg} />
+        </span>
       )}
-
-      <div className="row">
-        {selectMode ? (
-          <label className="checkbox" aria-label={`Select ${item.heading}`}>
-            <input type="checkbox" checked={selected} onChange={onToggleSelect} />
-          </label>
-        ) : (
-          <>
-            {item.pending && <span className="pill">Unsaved</span>}
-            <button type="button" className="btn" aria-label={`Edit ${item.heading}`} onClick={startEditing}>
-              Edit
-            </button>
-            <button
-              type="button"
-              className="btn btn-danger"
-              aria-label={`Delete ${item.heading}`}
-              onClick={() => {
-                if (confirm('Delete this entry?')) {
-                  void local.remove('exercise_entries', entry.id)
-                }
-              }}
-            >
-              Delete
-            </button>
-          </>
-        )}
+      <div className="grow">
+        {/* Metrics and timestamp on separate lines: joined into one they
+            wrap mid-date on a narrow phone, which reads as a mistake. */}
+        <div className="subtitle">{item.heading}</div>
+        {item.detail && <div className="muted mono">{item.detail}</div>}
+        <div className="muted mono">{formatWhen(item.performedAt)}</div>
+        {item.note && <div className="muted">{item.note}</div>}
+        {item.rejected && <div className="error">Rejected: {item.rejected}</div>}
       </div>
+
+      {item.pending && <span className="pill">Unsaved</span>}
     </article>
+  )
+}
+
+/** A session's own entry, inside its SessionGroup card — a plain summary
+ *  row (icon, name/detail, timestamp) rather than the flat timeline's
+ *  editable DdrEntryRow/ExerciseEntryRow. Editing and removing a session's
+ *  entries still happens on the session's own detail page; this is a
+ *  read-only "what happened" recap, matching the mockup's session rows,
+ *  which likewise carry no edit/delete affordance. */
+function SessionMemberRow({ item, band }: { item: TimelineItem; band: 'a' | 'b' }) {
+  return (
+    <div className={`entry-row entry-row-${band}`}>
+      {item.table === 'ddr_entries' ? (
+        item.photoPath ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a thumbnail doesn't need next/image's pipeline.
+          <img className="thumb thumb-ddr" src={`/api/photos/${item.photoPath}`} alt="" />
+        ) : (
+          <span className="thumb thumb-ddr thumb-fallback" aria-hidden="true">
+            <DdrArrowIcon />
+          </span>
+        )
+      ) : (
+        <span className="type-icon" aria-hidden="true">
+          <ExerciseIcon icon={item.icon ?? DEFAULT_EXERCISE_ICON} iconSvg={item.iconSvg} />
+        </span>
+      )}
+      <div className="grow">
+        <div className="subtitle">{item.heading}</div>
+        {item.detail && <div className="muted mono">{item.detail}</div>}
+      </div>
+      <div className="entry-row-when">{formatWhen(item.performedAt)}</div>
+    </div>
   )
 }
 
@@ -680,45 +694,42 @@ function SessionGroup({
   name,
   earliest,
   count,
-  sessionId,
-  children,
+  items,
 }: {
   name: string
   earliest: string
   count: number
-  sessionId: string
-  children: React.ReactNode
+  items: TimelineItem[]
 }) {
   const [isOpen, setIsOpen] = useState(true)
 
   return (
-    <div className="card">
-      <div className="spread">
-        <button
-          type="button"
-          className="session-toggle grow"
-          aria-expanded={isOpen}
-          onClick={() => setIsOpen((open) => !open)}
-        >
-          <span className={`disclosure-chevron${isOpen ? '' : ' is-collapsed'}`} aria-hidden="true">
-            ▾
+    <div className="session-card">
+      <button
+        type="button"
+        className="session-card-header"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+      >
+        <span className="grow">
+          <span className="subtitle">{name}</span>
+          <span className="muted mono">
+            {formatWhen(earliest)} · {count} entries
           </span>
-          <span className="grow">
-            <span className="subtitle">{name}</span>
-            <span className="muted mono">
-              {formatWhen(earliest)} · {count} entries
-            </span>
-          </span>
-        </button>
-        <Link href={`/sessions/${sessionId}`} className="btn">
-          Session
-        </Link>
-      </div>
+        </span>
+        <span className={`disclosure-chevron${isOpen ? '' : ' is-collapsed'}`} aria-hidden="true">
+          ▾
+        </span>
+      </button>
       <div className={`session-body${isOpen ? ' is-open' : ''}`}>
         {/* The inner wrapper is what actually gets clipped: the grid row
             above animates 0fr→1fr, and this clips its overflow so the
-            cards slide out of view instead of spilling past the card. */}
-        <div className="session-body-inner stack">{children}</div>
+            rows slide out of view instead of spilling past the card. */}
+        <div className="session-body-inner">
+          {items.map((item, i) => (
+            <SessionMemberRow key={`${item.table}:${item.id}`} item={item} band={i % 2 === 0 ? 'a' : 'b'} />
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -732,43 +743,16 @@ export default function Home() {
   const activeSession = useActiveSession()
 
   const loading = exercises === undefined || ddr === undefined
+  const sessionHref = activeSession ? `/sessions/${activeSession.id}` : '/sessions/start'
 
   const sessionById = useMemo(
     () => new Map((sessions ?? []).map((session) => [session.id, session])),
     [sessions],
   )
 
-  const [query, setQuery] = useState('')
-  const [kind, setKind] = useState<KindFilter>('all')
-  const [exerciseTypeId, setExerciseTypeId] = useState('all')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [sort, setSort] = useState<SortOrder>('date-desc')
-
-  const [selectMode, setSelectMode] = useState(false)
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
-  const [groupingOpen, setGroupingOpen] = useState(false)
-  const [groupChoice, setGroupChoice] = useState('new')
-  const [newSessionName, setNewSessionName] = useState('')
+  const [logPickerOpen, setLogPickerOpen] = useState(false)
 
   const itemKey = (item: TimelineItem) => `${item.table}:${item.id}`
-
-  function toggleSelected(key: string) {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
-  function exitSelectMode() {
-    setSelectMode(false)
-    setSelectedKeys(new Set())
-    setGroupingOpen(false)
-    setGroupChoice('new')
-    setNewSessionName('')
-  }
 
   const items = useMemo<TimelineItem[]>(() => {
     const typeOf = (id: string) => types?.find((t) => t.id === id)
@@ -826,70 +810,9 @@ export default function Home() {
     )
   }, [exercises, ddr, types])
 
-  const exerciseTypeFilterActive = kind !== 'ddr_entries' && exerciseTypeId !== 'all'
-  const hasActiveFilters =
-    query.trim() !== '' ||
-    kind !== 'all' ||
-    exerciseTypeFilterActive ||
-    dateFrom !== '' ||
-    dateTo !== ''
-
-  const filteredItems = useMemo(() => {
-    const q = query.trim().toLowerCase()
-
-    let result = items.filter((item) => {
-      if (kind !== 'all' && item.table !== kind) return false
-
-      if (kind !== 'ddr_entries' && exerciseTypeId !== 'all') {
-        if (item.table !== 'exercise_entries' || item.exerciseTypeId !== exerciseTypeId) {
-          return false
-        }
-      }
-
-      if (q && !item.heading.toLowerCase().includes(q) && !item.note?.toLowerCase().includes(q)) {
-        return false
-      }
-
-      // Compare by calendar day, not instant, so "From" and "To" are
-      // inclusive of everything logged on those days.
-      const day = item.performedAt.slice(0, 10)
-      if (dateFrom && day < dateFrom) return false
-      if (dateTo && day > dateTo) return false
-
-      return true
-    })
-
-    result = [...result].sort((a, b) => {
-      switch (sort) {
-        case 'date-asc':
-          return a.performedAt.localeCompare(b.performedAt)
-        case 'name-asc':
-          return a.heading.localeCompare(b.heading)
-        case 'name-desc':
-          return b.heading.localeCompare(a.heading)
-        default:
-          return b.performedAt.localeCompare(a.performedAt)
-      }
-    })
-
-    return result
-  }, [items, query, kind, exerciseTypeId, dateFrom, dateTo, sort])
-
-  const filterKey = JSON.stringify([query, kind, exerciseTypeId, dateFrom, dateTo, sort])
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const [prevFilterKey, setPrevFilterKey] = useState(filterKey)
-
-  // A new search/filter/sort produces a different result set, so pagination
-  // starts over rather than showing page 3 of a list the user just changed.
-  // Adjusted during render rather than in an effect, per React's guidance on
-  // resetting state in response to a prop/derived-value change.
-  if (filterKey !== prevFilterKey) {
-    setPrevFilterKey(filterKey)
-    setVisibleCount(PAGE_SIZE)
-  }
-
-  const visibleItems = filteredItems.slice(0, visibleCount)
-  const hasMore = visibleCount < filteredItems.length
+  const visibleItems = items.slice(0, visibleCount)
+  const hasMore = visibleCount < items.length
 
   const sentinelRef = useRef<HTMLDivElement | null>(null)
 
@@ -910,23 +833,32 @@ export default function Home() {
     return () => observer.disconnect()
   }, [hasMore])
 
-  const resetFilters = () => {
-    setQuery('')
-    setKind('all')
-    setExerciseTypeId('all')
-    setDateFrom('')
-    setDateTo('')
-  }
-
   // Clusters *consecutive* items sharing a session so grouping never fights
-  // the sort/pagination above it. A session member that lands elsewhere in
-  // the list (e.g. under a name sort, or split across a date filter) still
-  // renders as a normal card with a link back to its session instead.
+  // pagination above it. A session member that lands elsewhere in the visible
+  // page still renders as a normal row with a link back to its session
+  // instead of being forced into a group.
+  //
+  // Flat (non-grouped) rows are further clustered into "run"s of consecutive
+  // items — the mockup's timeline is one continuous banded list, not a stack
+  // of gap-separated cards, so a run renders as a single flush block (zero
+  // gap between its own rows) while still getting normal spacing from its
+  // neighboring blocks (session cards, other runs) via the outer .stack.
   const renderRows = useMemo(() => {
     const rows: (
-      | { kind: 'item'; item: TimelineItem }
+      | { kind: 'run'; entries: { item: TimelineItem; band: 'a' | 'b' }[] }
       | { kind: 'group'; sessionId: string; items: TimelineItem[] }
     )[] = []
+
+    // Session groups render as their own bordered card and don't take a
+    // turn in this alternation — it's only for rows in the flat list.
+    let flatIndex = 0
+    let run: { item: TimelineItem; band: 'a' | 'b' }[] = []
+    const flushRun = () => {
+      if (run.length > 0) {
+        rows.push({ kind: 'run', entries: run })
+        run = []
+      }
+    }
 
     let i = 0
     while (i < visibleItems.length) {
@@ -935,335 +867,95 @@ export default function Home() {
         let j = i + 1
         while (j < visibleItems.length && visibleItems[j].sessionId === item.sessionId) j += 1
         if (j - i >= 2) {
+          flushRun()
           rows.push({ kind: 'group', sessionId: item.sessionId, items: visibleItems.slice(i, j) })
           i = j
           continue
         }
       }
-      rows.push({ kind: 'item', item })
+      run.push({ item, band: flatIndex % 2 === 0 ? 'a' : 'b' })
+      flatIndex += 1
       i += 1
     }
+    flushRun()
 
     return rows
   }, [visibleItems])
 
-  const openSessions = sessions?.filter((s) => s.deleted_at === null) ?? []
-
-  async function confirmGrouping() {
-    const selected = items.filter((item) => selectedKeys.has(itemKey(item)))
-    if (selected.length === 0) return
-
-    const now = new Date().toISOString()
-    let sessionId: string
-
-    if (groupChoice === 'new') {
-      const performedAts = [...selected.map((item) => item.performedAt)].sort()
-      const session: WorkoutSession = {
-        id: crypto.randomUUID(),
-        name: newSessionName.trim() || null,
-        template_id: null,
-        started_at: performedAts[0],
-        ended_at: performedAts[performedAts.length - 1],
-        notes: null,
-        created_at: now,
-        updated_at: now,
-        deleted_at: null,
-      }
-      await local.put('workout_sessions', session)
-      sessionId = session.id
-    } else {
-      sessionId = groupChoice
-    }
-
-    await Promise.all(
-      selected.map((item) =>
-        local.put(item.table, { ...item.raw, session_id: sessionId, updated_at: now }),
-      ),
-    )
-
-    exitSelectMode()
-  }
-
-  function renderEntry(item: TimelineItem) {
+  function renderEntry(item: TimelineItem, band: 'a' | 'b') {
     const key = itemKey(item)
     return item.table === 'ddr_entries' ? (
-      <DdrEntryRow
-        key={key}
-        item={item}
-        selectMode={selectMode}
-        selected={selectedKeys.has(key)}
-        onToggleSelect={() => toggleSelected(key)}
-      />
+      <DdrEntryRow key={key} item={item} band={band} />
     ) : (
-      <ExerciseEntryRow
-        key={key}
-        item={item}
-        type={types?.find((t) => t.id === item.exerciseTypeId)}
-        selectMode={selectMode}
-        selected={selectedKeys.has(key)}
-        onToggleSelect={() => toggleSelected(key)}
-      />
+      <ExerciseEntryRow key={key} item={item} type={types?.find((t) => t.id === item.exerciseTypeId)} band={band} />
     )
   }
 
   return (
     <main className="page">
-      <header className="spread">
-        <h1 className="title">Health Tracker</h1>
-        <HeaderActions />
-      </header>
+      {/* The mockup's Home screen has no visible page title — the nav bar's
+          theme-labeled brand serves that role. Kept as a screen-reader-only
+          heading so the page still has one in the accessibility tree. */}
+      <h1 className="visually-hidden">Home</h1>
 
-      <div className="stack">
-        <div className="row">
-          <Link href="/log/exercise" className="btn btn-primary btn-lg grow">
-            Log exercise
-          </Link>
-          <Link href="/log/ddr" className="btn btn-primary btn-lg grow">
-            Log DDR
-          </Link>
-        </div>
-        <div className="row">
-          <Link
-            href={activeSession ? `/sessions/${activeSession.id}` : '/sessions/start'}
-            className="btn btn-block"
+      <div className="row">
+        <div className="log-picker-wrap grow">
+          <button
+            type="button"
+            className="btn btn-primary btn-lg btn-block"
+            aria-haspopup="menu"
+            aria-expanded={logPickerOpen}
+            onClick={() => setLogPickerOpen((open) => !open)}
           >
-            {activeSession ? 'Continue workout' : 'Start workout'}
-          </Link>
+            + Log
+          </button>
+          {logPickerOpen && (
+            <>
+              <div className="log-picker-backdrop" onClick={() => setLogPickerOpen(false)} />
+              <div className="log-picker-menu" role="menu">
+                <Link href="/log/ddr" className="log-picker-option" role="menuitem">
+                  DDR
+                </Link>
+                <Link href="/log/exercise" className="log-picker-option" role="menuitem">
+                  Exercise
+                </Link>
+              </div>
+            </>
+          )}
         </div>
-        <div className="row">
-          <Link href="/types" className="btn grow">
-            Manage exercises
-          </Link>
-          <Link href="/routines" className="btn grow">
-            Routines
-          </Link>
-        </div>
-        <div className="row">
-          <Link href="/data" className="btn grow">
-            Export &amp; backup
-          </Link>
-        </div>
-        <div className="row">
-          <Link href="/stats" className="btn grow">
-            Analytics
-          </Link>
-        </div>
+        <Link href="/routines" className="btn btn-lg grow">
+          + Routine
+        </Link>
+        <Link href={sessionHref} className="btn btn-lg grow">
+          {activeSession ? 'Resume' : 'Start Exercise'}
+        </Link>
       </div>
 
       <section className="stack">
-        <div className="spread">
-          <h2 className="subtitle">Recent</h2>
-          {!loading && items.length > 0 && (
-            <button
-              type="button"
-              className="btn"
-              onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
-            >
-              {selectMode ? 'Cancel' : 'Select'}
-            </button>
-          )}
-        </div>
-
-        {selectMode && (
-          <div className="card stack">
-            <div className="spread">
-              <span className="muted">{selectedKeys.size} selected</span>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={selectedKeys.size === 0}
-                onClick={() => setGroupingOpen(true)}
-              >
-                Group into session
-              </button>
-            </div>
-
-            {groupingOpen && (
-              <div className="stack">
-                <div className="field">
-                  <label className="label" htmlFor="group-choice">
-                    Session
-                  </label>
-                  <select
-                    id="group-choice"
-                    value={groupChoice}
-                    onChange={(e) => setGroupChoice(e.target.value)}
-                  >
-                    <option value="new">New session…</option>
-                    {openSessions.map((session) => (
-                      <option key={session.id} value={session.id}>
-                        {session.name ?? formatWhen(session.started_at)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {groupChoice === 'new' && (
-                  <div className="field">
-                    <label className="label" htmlFor="new-session-name">
-                      Name
-                    </label>
-                    <input
-                      id="new-session-name"
-                      value={newSessionName}
-                      onChange={(e) => setNewSessionName(e.target.value)}
-                      placeholder="Leg day (optional)"
-                      autoComplete="off"
-                    />
-                  </div>
-                )}
-
-                <div className="spread">
-                  <button type="button" className="btn" onClick={() => setGroupingOpen(false)}>
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={selectedKeys.size === 0}
-                    onClick={() => void confirmGrouping()}
-                  >
-                    Group {selectedKeys.size} {selectedKeys.size === 1 ? 'entry' : 'entries'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {!loading && items.length > 0 && (
-          <div className="card stack">
-            <div className="field">
-              <label className="label" htmlFor="search">
-                Search
-              </label>
-              <input
-                id="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Exercise, song, or note"
-                autoComplete="off"
-              />
-            </div>
-
-            <div className="row">
-              {(['all', 'exercise_entries', 'ddr_entries'] as const).map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={`btn grow ${kind === option ? 'btn-primary' : ''}`}
-                  aria-pressed={kind === option}
-                  onClick={() => setKind(option)}
-                >
-                  {KIND_LABELS[option]}
-                </button>
-              ))}
-            </div>
-
-            {kind !== 'ddr_entries' && (
-              <div className="field">
-                <label className="label" htmlFor="exercise-type">
-                  Exercise type
-                </label>
-                <select
-                  id="exercise-type"
-                  value={exerciseTypeId}
-                  onChange={(e) => setExerciseTypeId(e.target.value)}
-                >
-                  <option value="all">All exercises</option>
-                  {types?.map((type) => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            <div className="row">
-              <div className="field grow">
-                <label className="label" htmlFor="date-from">
-                  From
-                </label>
-                <input
-                  id="date-from"
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
-                />
-              </div>
-              <div className="field grow">
-                <label className="label" htmlFor="date-to">
-                  To
-                </label>
-                <input
-                  id="date-to"
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => setDateTo(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="field">
-              <label className="label" htmlFor="sort">
-                Sort by
-              </label>
-              <select
-                id="sort"
-                value={sort}
-                onChange={(e) => setSort(e.target.value as SortOrder)}
-              >
-                <option value="date-desc">Newest first</option>
-                <option value="date-asc">Oldest first</option>
-                <option value="name-asc">Name A&ndash;Z</option>
-                <option value="name-desc">Name Z&ndash;A</option>
-              </select>
-            </div>
-
-            {hasActiveFilters && (
-              <button type="button" className="btn btn-block" onClick={resetFilters}>
-                Clear filters
-              </button>
-            )}
-          </div>
-        )}
-
-        {!loading && items.length > 0 && (
-          <p className="muted">
-            {hasActiveFilters
-              ? `Showing ${filteredItems.length} of ${items.length} entries.`
-              : `${items.length} entries on this device.`}
-          </p>
-        )}
-
         {loading && <p className="muted">Loading…</p>}
 
-        {!loading && items.length === 0 && (
-          <div className="empty">Nothing logged yet.</div>
-        )}
+        {!loading && items.length === 0 && <div className="empty">Nothing logged yet.</div>}
 
-        {!loading && items.length > 0 && filteredItems.length === 0 && (
-          <div className="empty">No entries match your filters.</div>
-        )}
-
-        {renderRows.map((row) => {
-          if (row.kind === 'item') {
-            const item = row.item
-            if (!item.sessionId) return renderEntry(item)
-            // A session member that didn't land next to its mates (a name
-            // sort, a date filter) still renders normally, just with a link
-            // back to the session instead of being forced into a group.
+        {renderRows.map((row, rowIndex) => {
+          if (row.kind === 'run') {
             return (
-              <div key={itemKey(item)} className="stack" style={{ gap: 4 }}>
-                <Link
-                  href={`/sessions/${item.sessionId}`}
-                  className="muted"
-                  style={{ fontSize: '0.8rem', marginLeft: 4 }}
-                >
-                  Part of: {sessionById.get(item.sessionId)?.name ?? 'a session'}
-                </Link>
-                {renderEntry(item)}
+              <div key={`run-${rowIndex}`} className="entry-run">
+                {row.entries.map(({ item, band }) =>
+                  // A session member that landed elsewhere in the visible
+                  // page (a date filter, pagination) still renders normally,
+                  // just with a link back to its session instead of being
+                  // forced into a group.
+                  item.sessionId ? (
+                    <div key={itemKey(item)}>
+                      <Link href={`/sessions/${item.sessionId}`} className="muted entry-run-parent-of">
+                        Part of: {sessionById.get(item.sessionId)?.name ?? 'a session'}
+                      </Link>
+                      {renderEntry(item, band)}
+                    </div>
+                  ) : (
+                    renderEntry(item, band)
+                  ),
+                )}
               </div>
             )
           }
@@ -1278,10 +970,8 @@ export default function Home() {
               name={session?.name ?? 'Workout session'}
               earliest={earliest}
               count={row.items.length}
-              sessionId={row.sessionId}
-            >
-              {row.items.map((item) => renderEntry(item))}
-            </SessionGroup>
+              items={row.items}
+            />
           )
         })}
 

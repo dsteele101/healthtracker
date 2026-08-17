@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import { useRef, useState } from 'react'
 import {
   buildDdrCsv,
@@ -17,7 +16,6 @@ import {
   useIdentity,
   useSync,
 } from '@/lib/use-store'
-import { HeaderActions } from '../components/header-actions'
 
 export default function DataPage() {
   const exercises = useExerciseEntries()
@@ -118,10 +116,7 @@ export default function DataPage() {
 
   return (
     <main className="page">
-      <header className="spread">
-        <h1 className="title">Data</h1>
-        <HeaderActions />
-      </header>
+      <h1 className="title">Data</h1>
 
       <p className="muted">
         {exercises === undefined || ddr === undefined
@@ -275,9 +270,6 @@ export default function DataPage() {
       {message && <p className="muted">{message}</p>}
       {error && <p className="error">{error}</p>}
 
-      <Link href="/" className="btn btn-block">
-        Done
-      </Link>
     </main>
   )
 }

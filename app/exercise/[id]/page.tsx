@@ -10,7 +10,6 @@ import type { ExerciseType } from '@/lib/types'
 import { DEFAULT_EXERCISE_ICON } from '@/lib/exercise-icons'
 import { parseInfoUrl } from '@/lib/info-url'
 import { ExerciseIcon } from '../../components/exercise-icon'
-import { HeaderActions } from '../../components/header-actions'
 import { InfoUrlField } from '../../components/info-url-field'
 import { LinkPreview } from '../../components/link-preview'
 
@@ -105,10 +104,7 @@ export default function ExerciseDetailPage() {
 
   return (
     <main className="page">
-      <header className="spread">
-        <h1 className="title">{type.name}</h1>
-        <HeaderActions />
-      </header>
+      <h1 className="title">{type.name}</h1>
 
       <div className="card stack">
         <div className="row">

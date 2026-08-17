@@ -5,9 +5,11 @@ import { useMemo, useState } from 'react'
 import { formatDay, formatDuration } from '@/lib/format'
 import { useDdrEntries, useExerciseEntries, useExerciseTypes, useSongs } from '@/lib/use-store'
 import type { DdrEntry, ExerciseEntry } from '@/lib/types'
-import { HeaderActions } from '../components/header-actions'
+import { Dropdown } from '../components/dropdown'
 import { MetricSection } from '../components/metric-section'
+import { StreakGrid, type StreakDay } from '../components/streak-grid'
 import type { Point } from '../components/trend-chart'
+import { VolumeBarChart } from '../components/volume-bar-chart'
 
 // Mirrors log/exercise's remembered-type key, so Analytics opens on whatever
 // exercise was last logged rather than defaulting to the alphabetically first.
@@ -50,16 +52,70 @@ function RangePicker({ range, onChange }: { range: Range; onChange: (r: Range) =
 
 type Section = 'exercise' | 'ddr'
 
+const STREAK_WEEKS = 12
+
+/** Local-calendar-day key, so a day's activity groups correctly across a
+ *  timezone boundary (mirrors aggregateByDay's key below). */
+function dayKey(iso: string): string {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+}
+
+/** Most recent STREAK_WEEKS full calendar weeks (Sun-Sat), each day tagged
+ *  with its combined exercise + DDR count. Reflects all activity regardless
+ *  of the Exercise/DDR section toggle, since a streak is about showing up at
+ *  all. The window always ends on the Saturday of today's week so the grid
+ *  is a whole number of columns -- days after today in that final column are
+ *  marked `future` and rendered as blank spacers rather than fabricated
+ *  zero-activity cells. */
+function useConsistencyStreak(): StreakDay[] {
+  const exerciseEntries = useExerciseEntries()
+  const ddrEntries = useDdrEntries()
+
+  return useMemo(() => {
+    const counts = new Map<string, number>()
+    const bump = (iso: string) => {
+      const key = dayKey(iso)
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    for (const e of exerciseEntries ?? []) bump(e.performed_at)
+    for (const e of ddrEntries ?? []) bump(e.performed_at)
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const end = new Date(today)
+    end.setDate(end.getDate() + (6 - end.getDay()))
+    const start = new Date(end)
+    start.setDate(start.getDate() - (STREAK_WEEKS * 7 - 1))
+
+    const days: StreakDay[] = []
+    for (let i = 0; i < STREAK_WEEKS * 7; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+      days.push({
+        date: key,
+        iso: d.toISOString(),
+        count: counts.get(key) ?? 0,
+        future: d.getTime() > today.getTime(),
+      })
+    }
+    return days
+  }, [exerciseEntries, ddrEntries])
+}
+
 export default function StatsPage() {
   const [section, setSection] = useState<Section>('exercise')
   const [range, setRange] = useState<Range>('all')
+  const streak = useConsistencyStreak()
 
   return (
     <main className="page">
-      <header className="spread">
-        <h1 className="title">Analytics</h1>
-        <HeaderActions />
-      </header>
+      <h1 className="title">Analytics</h1>
+
+      <section className="card stack">
+        <h2 className="subtitle">Consistency</h2>
+        <StreakGrid days={streak} />
+      </section>
 
       <div className="seg" role="group" aria-label="Analytics section">
         {(['exercise', 'ddr'] as Section[]).map((s) => (
@@ -79,10 +135,6 @@ export default function StatsPage() {
       ) : (
         <DdrPanel range={range} onRangeChange={setRange} />
       )}
-
-      <Link href="/" className="btn btn-block">
-        Done
-      </Link>
     </main>
   )
 }
@@ -99,16 +151,11 @@ function ExercisePanel({
 
   const [remembered] = useState(readRememberedType)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
 
   const fallbackId =
     remembered && types?.some((t) => t.id === remembered) ? remembered : types?.[0]?.id
   const typeId = selectedId ?? fallbackId ?? ''
   const selected = types?.find((t) => t.id === typeId)
-
-  const filteredTypes = types?.filter((t) =>
-    t.name.toLowerCase().includes(query.trim().toLowerCase()),
-  )
 
   const cutoff = useCutoff(range)
 
@@ -162,53 +209,27 @@ function ExercisePanel({
 
   return (
     <>
-      <div className="field">
-        <label className="label" htmlFor="stats-type">
-          Exercise
-        </label>
-        <input
-          id="stats-type"
-          value={query}
-          placeholder={selected?.name ?? 'Search exercises…'}
-          onChange={(e) => setQuery(e.target.value)}
-          autoComplete="off"
-        />
-        {query.trim() && (
-          <div
-            className="stack"
-            style={{
-              marginTop: 8,
-              maxHeight: 240,
-              overflowY: 'auto',
-              gap: 6,
-            }}
-          >
-            {filteredTypes?.length ? (
-              filteredTypes.map((type) => (
-                <button
-                  key={type.id}
-                  type="button"
-                  className="btn btn-block"
-                  style={type.id === typeId ? { borderColor: 'var(--accent)' } : undefined}
-                  onClick={() => {
-                    setSelectedId(type.id)
-                    setQuery('')
-                  }}
-                >
-                  {type.name}
-                </button>
-              ))
-            ) : (
-              <p className="muted">No exercises match &ldquo;{query.trim()}&rdquo;.</p>
-            )}
-          </div>
-        )}
-      </div>
+      <Dropdown
+        id="stats-type"
+        label="Exercise"
+        value={typeId}
+        options={(types ?? []).map((type) => ({ value: type.id, label: type.name }))}
+        onChange={setSelectedId}
+        searchPlaceholder="Search exercises…"
+      />
 
       <RangePicker range={range} onChange={onRangeChange} />
 
       {selected?.tracks_reps && (
-        <MetricSection title="Reps" points={repsPoints} formatValue={(v) => `${v}`} />
+        <>
+          <MetricSection title="Reps" points={repsPoints} formatValue={(v) => `${v}`} />
+          {repsPoints.length > 0 && (
+            <section className="card stack">
+              <h2 className="subtitle">Volume</h2>
+              <VolumeBarChart points={repsPoints} formatValue={(v) => `${v}`} />
+            </section>
+          )}
+        </>
       )}
       {selected?.tracks_duration && (
         <MetricSection title="Time" points={durationPoints} formatValue={formatDuration} />
@@ -323,18 +344,14 @@ function DdrPanel({ range, onRangeChange }: { range: Range; onRangeChange: (r: R
       </div>
 
       {scope === 'song' && (
-        <div className="field">
-          <label className="label" htmlFor="stats-song">
-            Song
-          </label>
-          <select id="stats-song" value={songKey} onChange={(e) => setSelectedSongKey(e.target.value)}>
-            {songs.map((song) => (
-              <option key={song.id} value={song.title.toLowerCase()}>
-                {song.title}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Dropdown
+          id="stats-song"
+          label="Song"
+          value={songKey}
+          options={songs.map((song) => ({ value: song.title.toLowerCase(), label: song.title }))}
+          onChange={setSelectedSongKey}
+          searchPlaceholder="Search songs…"
+        />
       )}
 
       <RangePicker range={range} onChange={onRangeChange} />

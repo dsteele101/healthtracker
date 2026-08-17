@@ -12,8 +12,8 @@ import {
   useWorkoutSessions,
   useWorkoutTemplates,
 } from '@/lib/use-store'
-import type { DdrEntry, ExerciseEntry } from '@/lib/types'
-import { HeaderActions } from '../../components/header-actions'
+import type { DdrEntry, ExerciseEntry, WorkoutTemplateItem } from '@/lib/types'
+import { ScoreRing } from '../../components/score-ring'
 
 export default function SessionDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -36,9 +36,14 @@ export default function SessionDetailPage() {
     ? templates?.find((t) => t.id === session.template_id)
     : undefined
   const checklist = template?.items.map((item) => ({
+    item,
     type: types?.find((t) => t.id === item.exercise_type_id),
     done: memberExercises.some((entry) => entry.exercise_type_id === item.exercise_type_id),
   }))
+  // The exercise the user is currently working through: the first template
+  // item not yet logged, in routine order. Undefined once everything's done
+  // (or for a session with no template, which has no ordering to track).
+  const currentItem = checklist?.find((row) => !row.done)
 
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
@@ -88,6 +93,41 @@ export default function SessionDetailPage() {
     })
   }
 
+  async function addFromTemplateItem(item: WorkoutTemplateItem) {
+    if (!session) return
+    const now = new Date().toISOString()
+    const entry: ExerciseEntry = {
+      id: crypto.randomUUID(),
+      exercise_type_id: item.exercise_type_id,
+      sets: item.target_sets ?? 1,
+      reps: item.target_reps ?? null,
+      duration_seconds: item.target_duration_seconds ?? null,
+      weight: item.target_weight ?? null,
+      set_details: item.target_set_details ?? null,
+      notes: item.notes ?? null,
+      performed_at: now,
+      session_id: session.id,
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    }
+    await local.put('exercise_entries', entry)
+  }
+
+  async function toggleTemplateItem(item: WorkoutTemplateItem, done: boolean) {
+    if (done) {
+      const entry = memberExercises.find((e) => e.exercise_type_id === item.exercise_type_id)
+      if (entry) await removeExercise(entry)
+    } else {
+      await addFromTemplateItem(item)
+    }
+  }
+
+  async function addAllFromTemplate() {
+    const missing = checklist?.filter((row) => !row.done) ?? []
+    await Promise.all(missing.map((row) => addFromTemplateItem(row.item)))
+  }
+
   // Ungroups every current member before removing the session itself, so
   // deleting a session never leaves an entry pointing at a row the UI can no
   // longer show — the timeline's dangling-session fallback is a safety net,
@@ -132,10 +172,7 @@ export default function SessionDetailPage() {
 
   return (
     <main className="page">
-      <header className="spread">
-        <h1 className="title">{session.name ?? 'Workout session'}</h1>
-        <HeaderActions />
-      </header>
+      <h1 className="title">{session.name ?? 'Workout session'}</h1>
 
       {editing ? (
         <form onSubmit={save} className="card stack">
@@ -200,14 +237,32 @@ export default function SessionDetailPage() {
 
       {checklist && checklist.length > 0 && (
         <section className="stack">
-          <h2 className="subtitle">From {template?.name}</h2>
+          <div className="spread">
+            <h2 className="subtitle">From {template?.name}</h2>
+            <button
+              type="button"
+              className="btn"
+              disabled={checklist.every((row) => row.done)}
+              onClick={() => void addAllFromTemplate()}
+            >
+              Add all
+            </button>
+          </div>
           <div className="card stack">
-            {checklist.map((row, index) => (
-              <label key={index} className="checkbox">
-                <input type="checkbox" checked={row.done} readOnly />
-                {row.type?.name ?? 'Unknown exercise'}
-              </label>
-            ))}
+            {checklist.map((row, index) => {
+              const isCurrent = row === currentItem
+              return (
+                <label key={index} className={`checkbox${isCurrent ? ' checkbox-current' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={row.done}
+                    onChange={() => void toggleTemplateItem(row.item, row.done)}
+                  />
+                  <span className="grow">{row.type?.name ?? 'Unknown exercise'}</span>
+                  {isCurrent && <span className="pill">Current</span>}
+                </label>
+              )
+            })}
           </div>
         </section>
       )}
@@ -251,16 +306,13 @@ export default function SessionDetailPage() {
                 {entry.percentage_score}% · {formatWhen(entry.performed_at)}
               </div>
             </div>
+            <ScoreRing scorePct={entry.percentage_score} />
             <button type="button" className="btn" onClick={() => void removeDdr(entry)}>
               Remove
             </button>
           </article>
         ))}
       </section>
-
-      <Link href="/" className="btn btn-block">
-        Back
-      </Link>
     </main>
   )
 }

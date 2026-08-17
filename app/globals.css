@@ -11,11 +11,38 @@
   --danger: #dc2626;
   --ok: #059669;
 
+  /* Second surface/accent step and per-theme type/radius knobs, added for the
+     theme system below. Values here are Outfox's own — every rule that used
+     to hardcode a literal now reads one of these instead, so Outfox renders
+     unchanged. */
+  --surface-alt: #e4e7f5;
+  --accent2: #22c6f2;
+
+  --font-display: "Rajdhani", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Rajdhani", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --weight-body: 500;
+  --weight-title: 700;
+  --weight-mono: 600;
+
+  --radius-input: 8px;
+  --radius-card: 12px;
+  --radius-control: 0px;
+
+  /* Height of the persistent nav bar, so the sticky active-session bar below
+     it can offset instead of overlapping. */
+  --nav-h: 60px;
+
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  /* Scoped to "no theme chosen yet" and "outfox explicitly chosen" — Outfox
+     is the only theme with a light/dark split; StepMania is always dark and
+     Fitness is always light (see the [data-theme] blocks below). */
+  :root:not([data-theme]),
+  [data-theme="outfox"] {
     --background: #0d1128;
     --surface: #161b3a;
     --border: #2c3566;
@@ -25,7 +52,52 @@
     --accent-contrast: #14152b;
     --danger: #f87171;
     --ok: #34d399;
+    --surface-alt: #1c2350;
+    --accent2: #22c6f2;
   }
+}
+
+[data-theme="stepmania"] {
+  --background: #08080b;
+  --surface: #131318;
+  --surface-alt: #1b1b22;
+  --border: #2a2a35;
+  --foreground: #f5f5fa;
+  --muted: #8b8b9a;
+  --accent: oklch(72% 0.24 340);
+  --accent2: oklch(78% 0.19 195);
+  --accent-contrast: #08080b;
+  --font-display: "Chakra Petch", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Space Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --weight-body: 400;
+  --weight-title: 700;
+  --weight-mono: 700;
+  --radius-input: 0px;
+  --radius-card: 0px;
+  --radius-control: 0px;
+}
+
+[data-theme="fitness"] {
+  --background: oklch(98% 0.005 145);
+  --surface: oklch(96% 0.01 145);
+  --surface-alt: oklch(93% 0.015 145);
+  --border: oklch(88% 0.01 145);
+  --foreground: oklch(20% 0.02 145);
+  --muted: oklch(48% 0.02 145);
+  --accent: oklch(58% 0.19 145);
+  --accent2: oklch(58% 0.19 25);
+  --accent-contrast: #ffffff;
+  --font-display: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --weight-body: 400;
+  --weight-title: 800;
+  --weight-mono: 600;
+  --radius-input: 14px;
+  --radius-card: 14px;
+  --radius-control: 14px;
 }
 
 * {
@@ -50,14 +122,13 @@ body {
   flex-direction: column;
   color: var(--foreground);
   background: var(--background);
-  /* Rajdhani is self-hosted via @fontsource (files ship in the npm package,
-     fetched once at `npm install`), so `next build` still needs no network —
-     see the import in layout.tsx. Condensed + technical, reads like a
-     rhythm-game HUD; weight 500 as the body default since we only ship
-     500/600/700. */
-  font-family: "Rajdhani", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-weight: 500;
+  /* Every theme's fonts are self-hosted via @fontsource (files ship in the
+     npm package, fetched once at `npm install`), so `next build` still needs
+     no network — see the imports in layout.tsx. --font-body/--weight-body
+     are Rajdhani/500 for Outfox by default; StepMania and Fitness override
+     both, see the [data-theme] blocks above. */
+  font-family: var(--font-body);
+  font-weight: var(--weight-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* Keep content clear of the notch and home indicator in standalone mode. */
@@ -90,7 +161,7 @@ textarea {
   min-height: 44px;
   background: var(--background);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   padding: 0 12px;
   width: 100%;
 }
@@ -129,7 +200,7 @@ textarea:focus-visible {
    hack anywhere else. */
 .active-session-bar {
   position: sticky;
-  top: 0;
+  top: var(--nav-h);
   z-index: 30;
   display: flex;
   align-items: center;
@@ -149,6 +220,19 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* Below the width where max-width above would otherwise start providing its
+   own side margins, drop the page's own left/right padding so cards and
+   button bars run edge-to-edge with the screen — matching the mockup, which
+   only insets content once there's a "desktop frame" around it to inset
+   from. Vertical padding (top clearance, bottom scroll clearance) is
+   unaffected; this is a horizontal-only full-bleed. */
+@media (max-width: 640px) {
+  .page {
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 .stack {
@@ -178,13 +262,15 @@ textarea:focus-visible {
 /* --- type ------------------------------------------------------------------ */
 
 .title {
+  font-family: var(--font-display);
   font-size: 1.9rem;
-  font-weight: 700;
+  font-weight: var(--weight-title);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .subtitle {
+  font-family: var(--font-display);
   font-size: 1.15rem;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -197,7 +283,7 @@ textarea:focus-visible {
 
 .mono {
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: var(--weight-mono);
 }
 
 /* --- surfaces -------------------------------------------------------------- */
@@ -205,7 +291,7 @@ textarea:focus-visible {
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   padding: 14px;
   animation: rise 220ms ease-out both;
   transition: background-color 120ms ease, border-color 120ms ease;
@@ -237,25 +323,118 @@ article.card.spread > .row {
   }
 }
 
-/* A grouped session on the timeline. The header row is a real <button> so
-   it's keyboard- and screen-reader-operable; it carries aria-expanded and
-   the collapse state lives in React (see SessionGroup in app/page.tsx). */
-.session-toggle {
+/* --- home timeline: banded rows ------------------------------------------ */
+
+/* The mockup's Home timeline isn't a stack of separate bordered cards — it's
+   one continuous list of full-bleed rows, alternating between --surface and
+   --background so consecutive entries stay visually distinct without a
+   border or gap between them. Used for both the flat timeline (article.card
+   is NOT used here) and, nested inside .session-card, a session's own
+   entries. */
+.entry-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 20px;
+}
+
+.entry-row-a {
+  background: var(--surface);
+}
+
+.entry-row-b {
+  background: var(--background);
+}
+
+.entry-row > .grow {
+  min-width: 140px;
+}
+
+.entry-row > .row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 8px;
+}
+
+/* The flat timeline's rows: no more inline Edit/Delete — tapping the row
+   itself opens the edit form (see startEditing in app/page.tsx), so it
+   needs to look and behave like the tap target it is. */
+.entry-row-tappable {
+  cursor: pointer;
+  transition: transform 100ms ease, filter 150ms ease;
+}
+
+.entry-row-tappable:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) {
+  .entry-row:hover {
+    filter: brightness(1.08);
+  }
+}
+
+/* Right-aligned timestamp for a session's own (read-only) member rows —
+   see SessionMemberRow in app/page.tsx. */
+.entry-row-when {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A run of consecutive flat rows (see the .stack of renderRows in
+   app/page.tsx): zero gap between its own .entry-rows so they read as one
+   continuous banded list, while the run itself still gets normal spacing
+   from whatever's next to it (a .session-card, another run) via the
+   surrounding .stack. */
+.entry-run {
+  display: flex;
+  flex-direction: column;
+}
+
+.entry-run-parent-of {
+  display: block;
+  padding: 6px 20px 0;
+  font-size: 0.78rem;
+}
+
+/* The bordered/rounded card that wraps a session group — the ONE card-like
+   element in the timeline; its own rows reuse .entry-row/-a/-b, clipped to
+   the card's rounded corners by overflow: hidden. */
+.session-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  animation: rise 220ms ease-out both;
+}
+
+/* A grouped session's header. A real <button> so it's keyboard- and
+   screen-reader-operable; it carries aria-expanded and the collapse state
+   lives in React (see SessionGroup in app/page.tsx). Name and meta are
+   <span>s rather than block elements by default (so they read as one
+   phrase to a screen reader), forced onto separate lines here to match the
+   two-line header the mockup shows. */
+.session-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
+  width: 100%;
+  padding: 14px 20px;
   background: none;
-  border: 0;
-  padding: 0;
-  margin: 0;
+  border: none;
   font: inherit;
   color: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.session-toggle .subtitle,
-.session-toggle .muted {
+.session-card-header .subtitle,
+.session-card-header .muted {
   display: block;
 }
 
@@ -287,19 +466,12 @@ article.card.spread > .row {
   opacity: 1;
 }
 
-/* The gap between the header and the first card. It has to animate along
-   with the row rather than just sit there: padding is not clipped by the
-   row's `min-height: 0`, so a static 12px would leave the drawer stuck at
-   12px tall when closed instead of collapsing flush. */
+/* No top padding: a session's own rows (.entry-row, see app/page.tsx) sit
+   flush against the header, matching the mockup's banded-list look rather
+   than a gap-separated stack. */
 .session-body-inner {
   overflow: hidden;
   min-height: 0;
-  padding-top: 12px;
-  transition: padding-top 240ms ease;
-}
-
-.session-body:not(.is-open) .session-body-inner {
-  padding-top: 0;
 }
 
 /* A deliberate exemption from the blanket reduced-motion rule at the bottom
@@ -327,7 +499,7 @@ article.card.spread > .row {
 
 .empty {
   border: 1px dashed var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   padding: 24px 16px;
   text-align: center;
   color: var(--muted);
@@ -337,7 +509,7 @@ article.card.spread > .row {
 .thumb {
   width: 48px;
   height: 48px;
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   border: 1px solid var(--border);
   object-fit: cover;
   flex-shrink: 0;
@@ -386,7 +558,7 @@ a:has(> .thumb):active .thumb {
 .type-icon {
   width: 48px;
   height: 48px;
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   border: 1px solid var(--border);
   background: var(--background);
   display: flex;
@@ -403,7 +575,7 @@ a:has(> .thumb):active .thumb {
   position: relative;
   width: 100%;
   padding-top: 56.25%;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--background);
@@ -434,7 +606,7 @@ a:has(> .thumb):active .thumb {
 .link-preview-thumb {
   width: 72px;
   height: 72px;
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   object-fit: cover;
   border: 1px solid var(--border);
   background: var(--background);
@@ -454,7 +626,7 @@ a:has(> .thumb):active .thumb {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--foreground);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   padding: 0 16px;
   font-weight: 700;
   text-transform: uppercase;
@@ -574,6 +746,16 @@ a:has(> .thumb):active .thumb {
   transform: scale(0.88);
 }
 
+/* The next not-yet-logged item in a template checklist — see currentItem in
+   app/sessions/[id]/page.tsx. */
+.checkbox-current {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-card);
+  padding-left: 10px;
+  padding-right: 10px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
 /* --- icon picker ------------------------------------------------------------ */
 
 .icon-grid {
@@ -586,7 +768,7 @@ a:has(> .thumb):active .thumb {
   min-height: 44px;
   border: 1px solid var(--border);
   background: var(--background);
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   font-size: 1.25rem;
   display: flex;
   align-items: center;
@@ -679,7 +861,7 @@ button.pill:not(:disabled):active {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -691,6 +873,113 @@ button.pill:not(:disabled):active {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--accent-contrast);
+}
+
+/* --- dropdown ---------------------------------------------------------------- */
+
+/* App-styled stand-in for a native <select> -- the trigger matches
+   input/select sizing exactly, and the option list opens as a card-style
+   panel instead of the browser's own unthemeable popup. */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-input);
+  font-size: 16px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  text-align: left;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.dropdown-trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.dropdown-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  transition: transform 150ms ease;
+}
+
+.dropdown-trigger[aria-expanded='true'] .dropdown-chevron {
+  transform: rotate(180deg);
+}
+
+.dropdown-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 25;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  animation: rise 160ms ease-out both;
+}
+
+.dropdown-search {
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.dropdown-options {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.dropdown-option {
+  min-height: 44px;
+  padding: 0 14px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.dropdown-option:last-child {
+  border-bottom: none;
+}
+
+@media (hover: hover) {
+  .dropdown-option:hover {
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  }
+}
+
+.dropdown-option-active {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.dropdown-empty {
+  padding: 12px 14px;
 }
 
 /* --- charts ------------------------------------------------------------------ */
@@ -753,7 +1042,7 @@ button.pill:not(:disabled):active {
   transform: translate(-50%, -130%);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-input);
   padding: 6px 10px;
   font-size: 0.8rem;
   display: flex;
@@ -799,44 +1088,7 @@ button.pill:not(:disabled):active {
 
 /* --- motion ------------------------------------------------------------------ */
 
-/* --- account menu ----------------------------------------------------------- */
-
-/* The right-hand side of every page header. Shrinks before the title does, and
-   never wraps the avatar onto its own line. */
-.header-actions {
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.profile-menu {
-  position: relative;
-  flex-shrink: 0;
-}
-
-/* Same 44px touch target as the icon choices, with the picture inset. */
-.avatar-btn {
-  width: 44px;
-  height: 44px;
-  min-height: 44px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--surface);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  cursor: pointer;
-  transition: border-color 120ms ease, transform 100ms ease;
-}
-
-.avatar-btn:active {
-  transform: scale(0.92);
-}
-
-.avatar-btn[aria-expanded='true'] {
-  border-color: var(--accent);
-}
+/* --- account ------------------------------------------------------------- */
 
 .avatar-img {
   border-radius: 50%;
@@ -848,23 +1100,402 @@ button.pill:not(:disabled):active {
   line-height: 1;
 }
 
-.profile-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  /* Wider than the button it hangs off, but never wider than the screen on a
-     phone, where "right: 0" would otherwise push it off the left edge. */
-  width: min(320px, calc(100vw - 32px));
-  /* Above the sticky active-session bar (z-index 30), which is the only other
-     thing that overlaps content. */
-  z-index: 40;
-  box-shadow: 0 12px 32px rgb(0 0 0 / 45%);
-  max-height: min(70vh, 560px);
-  overflow-y: auto;
-}
-
 .profile-identity {
   align-items: center;
+}
+
+/* --- nav bar ----------------------------------------------------------- */
+
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  height: var(--nav-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  transition: background-color 260ms ease, border-color 260ms ease;
+}
+
+.nav-brand {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
+  background: none;
+  border: none;
+  padding: 0;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+[data-theme="stepmania"] .nav-brand {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.nav-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nav-tab {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 8px 14px;
+  min-height: 36px;
+  border: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  background: transparent;
+  color: var(--muted);
+  border-radius: var(--radius-control);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.nav-tab-active {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+/* Outfox: a notched tab, matching the app's HUD look. */
+[data-theme="outfox"] .nav-tab-active {
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
+}
+
+/* StepMania: hard square corners, uppercase. */
+[data-theme="stepmania"] .nav-tab {
+  border-radius: 0;
+  text-transform: uppercase;
+}
+
+/* Fitness: pill-shaped tabs. */
+[data-theme="fitness"] .nav-tab {
+  border-radius: 999px;
+}
+
+.nav-hamburger {
+  display: none;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--foreground);
+  font-size: 1.1rem;
+  padding: 0;
+}
+
+.nav-avatar-link {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.nav-menu-panel {
+  position: fixed;
+  top: calc(var(--nav-h) + 8px);
+  left: 16px;
+  right: 16px;
+  z-index: 21;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.nav-menu-item {
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  background: transparent;
+  color: var(--muted);
+}
+
+.nav-menu-item:last-child {
+  border-bottom: none;
+}
+
+.nav-menu-item-active {
+  background: var(--surface-alt);
+  color: var(--foreground);
+}
+
+@media (max-width: 560px) {
+  .nav-tabs-row {
+    display: none;
+  }
+
+  .nav-hamburger {
+    display: inline-flex;
+  }
+}
+
+/* --- StepMania marquee --------------------------------------------------- */
+
+.marquee-wrap {
+  display: none;
+  overflow: hidden;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+[data-theme="stepmania"] .marquee-wrap {
+  display: block;
+}
+
+.marquee-track {
+  display: inline-block;
+  padding: 6px 0;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent2);
+  animation: marqueeScroll 16s linear infinite;
+}
+
+@keyframes marqueeScroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* --- home "+ Log" picker ---------------------------------------------------- */
+
+.log-picker-wrap {
+  position: relative;
+}
+
+.log-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+}
+
+.log-picker-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.log-picker-option {
+  padding: 13px 16px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+.log-picker-option:last-child {
+  border-bottom: none;
+}
+
+@media (hover: hover) {
+  .log-picker-option:hover {
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+  }
+}
+
+/* --- settings ------------------------------------------------------------ */
+
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.theme-picker-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.theme-card {
+  flex: 1 1 150px;
+  min-width: 140px;
+  text-align: left;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-card);
+  transition: border-color 160ms ease, transform 100ms ease;
+}
+
+.theme-card-active {
+  border-color: var(--accent);
+}
+
+.theme-swatch-row {
+  display: flex;
+  gap: 4px;
+}
+
+.theme-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.theme-card-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.theme-card-tagline {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* --- score ring ------------------------------------------------------------ */
+
+.score-ring {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.score-ring-inner {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background: var(--background);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.score-ring-rank {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.65rem;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.score-ring-pct {
+  font-size: 0.5rem;
+  color: var(--muted);
+  line-height: 1.3;
+}
+
+/* --- consistency streak grid ---------------------------------------------- */
+
+/* GitHub-contribution-graph layout: weeks as columns, Sun-Sat stacked
+   top-to-bottom within each. Column count is set inline (depends on
+   STREAK_WEEKS in stats/page.tsx), row count is fixed at 7. */
+.streak-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.streak-cell,
+.streak-cell-spacer {
+  width: 100%;
+  padding-bottom: 100%;
+  border-radius: 3px;
+}
+
+.streak-cell {
+  min-height: 0;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  transition: transform 100ms ease, background-color 120ms ease;
+}
+
+.streak-cell:hover,
+.streak-cell:focus-visible {
+  transform: scale(1.2);
+}
+
+.streak-level-1 {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 25%, var(--surface-alt));
+}
+
+.streak-level-2 {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 50%, var(--surface-alt));
+}
+
+.streak-level-3 {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 75%, var(--surface-alt));
+}
+
+.streak-level-4 {
+  border-color: transparent;
+  background: var(--accent);
 }
 
 /* Reachable by a screen reader and by .click(), invisible to everyone else --
