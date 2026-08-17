@@ -2,8 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
-import { THEME_CHANGE_EVENT, THEME_LABEL, type ThemeId } from '@/lib/theme'
+import { useMemo, useState } from 'react'
 import { useActiveSession, useIdentity } from '@/lib/use-store'
 import { ProfileAvatar, displayNameOf } from './profile-avatar'
 import { SyncBadge } from './sync-badge'
@@ -40,21 +39,11 @@ function buildNavItems(sessionHref: string): NavItem[] {
  *  visibility and font all come from `[data-theme]` CSS in globals.css; the
  *  only thing this component branches on in JS is which tab is active and
  *  whether the mobile menu is open. */
-export function NavBar({ initialTheme }: { initialTheme: ThemeId }) {
+export function NavBar() {
   const pathname = usePathname()
   const user = useIdentity()
   const activeSession = useActiveSession()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [theme, setTheme] = useState(initialTheme)
-
-  // CSS reacts to `[data-theme]` on its own; the brand text is JS-rendered
-  // content, so it needs this explicit signal to follow a live theme switch
-  // from Settings instead of only updating on the next full navigation.
-  useEffect(() => {
-    const onThemeChange = (event: Event) => setTheme((event as CustomEvent<ThemeId>).detail)
-    window.addEventListener(THEME_CHANGE_EVENT, onThemeChange)
-    return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemeChange)
-  }, [])
 
   const sessionHref = activeSession ? `/sessions/${activeSession.id}` : '/sessions/start'
   const navItems = useMemo(() => buildNavItems(sessionHref), [sessionHref])
@@ -73,26 +62,28 @@ export function NavBar({ initialTheme }: { initialTheme: ThemeId }) {
         </button>
 
         <Link href="/" className="nav-brand">
-          {THEME_LABEL[theme]}
+          Health Tracker
         </Link>
 
-        <div className="nav-tabs-row">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`nav-tab ${item.match(pathname) ? 'nav-tab-active' : ''}`}
-            >
-              {item.label}
-            </Link>
-          ))}
+        <div className="nav-actions">
+          <div className="nav-tabs-row">
+            {navItems.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className={`nav-tab ${item.match(pathname) ? 'nav-tab-active' : ''}`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+
+          <SyncBadge />
+
+          <Link href="/settings" className="nav-avatar-link" aria-label={`Settings: ${displayNameOf(user)}`}>
+            <ProfileAvatar user={user} size={36} />
+          </Link>
         </div>
-
-        <SyncBadge />
-
-        <Link href="/settings" className="nav-avatar-link" aria-label={`Settings: ${displayNameOf(user)}`}>
-          <ProfileAvatar user={user} size={36} />
-        </Link>
       </nav>
 
       {menuOpen && (

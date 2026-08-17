@@ -14,13 +14,6 @@ export const THEME_COOKIE = 'theme'
 
 const THEME_STORAGE_KEY = 'tracker:theme'
 
-/** Fired on `window` whenever `applyTheme` runs, carrying the new ThemeId as
- *  `event.detail`. The nav bar's brand text mirrors the active theme's name
- *  and needs to update live when the user switches theme from Settings —
- *  CSS alone (the `[data-theme]` attribute) handles every color/shape/font
- *  change already, but text content needs an explicit signal. */
-export const THEME_CHANGE_EVENT = 'themechange'
-
 export function isThemeId(value: unknown): value is ThemeId {
   return typeof value === 'string' && (THEMES as string[]).includes(value)
 }
@@ -33,15 +26,6 @@ export const THEME_COLOR: Record<ThemeId, string> = {
   outfox: '#0d1128',
   stepmania: '#08080b',
   fitness: '#ffffff',
-}
-
-/** Display name per theme — the mockup's nav bar shows this in the brand
- *  slot (`{{ theme.label }}`) instead of a fixed app name, so the theme
- *  itself is always in view, not just its colors. */
-export const THEME_LABEL: Record<ThemeId, string> = {
-  outfox: 'Project Outfox',
-  stepmania: 'StepMania',
-  fitness: 'Fitness',
 }
 
 /** Switches the live theme: updates the DOM attribute immediately, and
@@ -57,6 +41,4 @@ export function applyTheme(theme: ThemeId): void {
 
   const meta = document.querySelector('meta[name="theme-color"]')
   if (meta) meta.setAttribute('content', THEME_COLOR[theme])
-
-  window.dispatchEvent(new CustomEvent<ThemeId>(THEME_CHANGE_EVENT, { detail: theme }))
 }

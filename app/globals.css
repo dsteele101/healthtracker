@@ -1138,6 +1138,14 @@ button.pill:not(:disabled):active {
   letter-spacing: 0.06em;
 }
 
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .nav-tabs-row {
   display: flex;
   align-items: center;
@@ -1209,6 +1217,7 @@ button.pill:not(:disabled):active {
 
 .nav-avatar-link {
   flex-shrink: 0;
+  margin-left: auto;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -1263,12 +1272,31 @@ button.pill:not(:disabled):active {
 }
 
 @media (max-width: 560px) {
+  /* Below this width the tab strip collapses into the hamburger menu, so the
+   * bar only has three small slots left (menu / title / avatar) — switch to
+   * a grid so the title lands dead-center regardless of how wide the other
+   * two slots are, instead of just sitting in the leftover flex space. */
+  .nav-bar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+  }
+
+  .nav-brand {
+    justify-self: center;
+  }
+
+  .nav-actions {
+    flex: 0 0 auto;
+    justify-self: end;
+  }
+
   .nav-tabs-row {
     display: none;
   }
 
   .nav-hamburger {
     display: inline-flex;
+    justify-self: start;
   }
 }
 
